@@ -59,7 +59,6 @@ async def run():
     steward['did_for_sec'], steward['key_for_sec'], sec['did_for_steward'], sec['key_for_steward'], _ = await onboarding(steward, sec)
     print(tab + "Steward -> Assign DID to SEC")
     sec['did'] = await get_verinym(steward,
-                                   steward['did_for_sec'],
                                    steward['key_for_sec'],
                                    sec,
                                    sec['did_for_steward'],
@@ -77,7 +76,6 @@ async def run():
     steward['did_for_auditor'], steward['key_for_auditor'], auditor['did_for_steward'], auditor['key_for_steward'], _ = await onboarding(steward, auditor)
     print(tab + "Steward -> Assign DID to Auditor")
     auditor['did'] = await get_verinym(steward,
-                                       steward['did_for_auditor'],
                                        steward['key_for_auditor'],
                                        auditor,
                                        auditor['did_for_steward'],
@@ -95,7 +93,6 @@ async def run():
     steward['did_for_goldman_sachs'], steward['key_for_goldman_sachs'], goldman_sachs['did_for_steward'], goldman_sachs['key_for_steward'], _ = await onboarding(steward, goldman_sachs)
     print(tab + "Steward -> Assign DID to Goldman Sachs")
     goldman_sachs['did'] = await get_verinym(steward,
-                                             steward['did_for_goldman_sachs'],
                                              steward['key_for_goldman_sachs'],
                                              goldman_sachs,
                                              goldman_sachs['did_for_steward'],
@@ -310,8 +307,7 @@ async def run():
                                              cred_for_predicate1['referent']: cred_for_predicate1}
     jp_morgan['schemas'], jp_morgan['cred_defs'], jp_morgan['revoc_states'] = await prover_get_entities_from_ledger(jp_morgan['pool'],
                                                                                                                     jp_morgan['did_for_goldman_sachs'],
-                                                                                                                    jp_morgan['creds_for_kyc_cred_proof'],
-                                                                                                                    jp_morgan['name'])
+                                                                                                                    jp_morgan['creds_for_kyc_cred_proof'])
 
     print("JP Morgan -> Create KYC Credential Proof")
     jp_morgan['kyc_cred_requested_creds'] = json.dumps({
@@ -344,8 +340,7 @@ async def run():
                                                                                       goldman_sachs['authcrypted_kyc_cred_proof'])
     goldman_sachs['schemas'], goldman_sachs['cred_defs'], goldman_sachs['revoc_ref_defs'], goldman_sachs['revoc_regs'] = await verifier_get_entities_from_ledger(goldman_sachs['pool'],
                                                                                                                                                                  goldman_sachs['did'],
-                                                                                                                                                                 decrypted_kyc_cred_proof['identifiers'],
-                                                                                                                                                                 goldman_sachs['name'])
+                                                                                                                                                                 decrypted_kyc_cred_proof['identifiers'])
 
     print("Goldman Sachs -> Verify KYC Credential Proof from JP Morgan")
     assert 'JP Morgan' == decrypted_kyc_cred_proof['requested_proof']['self_attested_attrs']['attr1_referent']
@@ -422,7 +417,7 @@ async def onboarding(_from, to):
     return from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response']
 
 
-async def get_verinym(_from, from_to_did, from_to_key, to, to_from_did, to_from_key):
+async def get_verinym(_from, from_to_key, to, to_from_did, to_from_key):
     (to_did, to_key) = await did.create_and_store_my_did(to['wallet'], "{}")
     to['did_info'] = json.dumps({
         'did': to_did,
@@ -478,7 +473,7 @@ async def get_credential_for_referent(search_handle, referent):
     return credentials[0]['cred_info']
 
 
-async def prover_get_entities_from_ledger(pool_handle, _did, identifiers, actor):
+async def prover_get_entities_from_ledger(pool_handle, _did, identifiers):
     schemas = {}
     cred_defs = {}
     rev_states = {}
@@ -490,12 +485,12 @@ async def prover_get_entities_from_ledger(pool_handle, _did, identifiers, actor)
         cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
         if 'rev_reg_seq_no' in item:
-            pass  # TODO Create Revocation States
+            pass
 
     return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_states)
 
 
-async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers, actor):
+async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers):
     schemas = {}
     cred_defs = {}
     rev_reg_defs = {}
@@ -508,7 +503,7 @@ async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers, acto
         cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
         if 'rev_reg_seq_no' in item:
-            pass  # TODO Get Revocation Definitions and Revocation Registries
+            pass
 
     return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_reg_defs), json.dumps(rev_regs)
 
@@ -524,4 +519,4 @@ if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(run())
-    time.sleep(1)  # FIXME waiting for libindy thread complete
+    time.sleep(1)
