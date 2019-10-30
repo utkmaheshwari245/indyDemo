@@ -1,8 +1,8 @@
 import asyncio
 import time
-from indy import anoncreds, crypto, did, ledger, pool, wallet
-
 import json
+
+from indy import anoncreds, crypto, did, ledger, pool, wallet
 
 tab = "    "
 
@@ -355,7 +355,7 @@ async def run():
     print("==============================")
     print("==============================")
 
-    print("Close and Delete government\'s Wallet")
+    print("Close and Delete Government\'s Wallet")
     await wallet.close_wallet(government['wallet'])
     await wallet.delete_wallet(government['wallet_config'], government['wallet_credentials'])
 
