@@ -3,7 +3,6 @@ import time
 from indy import anoncreds, crypto, did, ledger, pool, wallet
 
 import json
-from typing import Optional
 
 
 async def run():
@@ -25,29 +24,29 @@ async def run():
     print(tab + "Get Pool Handle")
     pool_['handle'] = await pool.open_pool_ledger(pool_['name'], None)
 
-    print("Setup Steward")
-    steward = {
-        'name': "Steward",
-        'wallet_config': json.dumps({'id': 'steward_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'steward_wallet_key'}),
+    print("Setup Government")
+    government = {
+        'name': "Government",
+        'wallet_config': json.dumps({'id': 'government_wallet'}),
+        'wallet_credentials': json.dumps({'key': 'government_wallet_key'}),
         'pool': pool_['handle'],
         'seed': '000000000000000000000000Steward1'
     }
-    print(tab + "Create Steward Wallet")
+    print(tab + "Create Government Wallet")
     try:
-        await wallet.create_wallet(steward['wallet_config'], steward['wallet_credentials'])
+        await wallet.create_wallet(government['wallet_config'], government['wallet_credentials'])
     except IndyError as ex:
         if ex.error_code == ErrorCode.WalletAlreadyExistsError:
             pass
-    steward['wallet'] = await wallet.open_wallet(steward['wallet_config'], steward['wallet_credentials'])
-    steward['did_info'] = json.dumps({'seed': steward['seed']})
+    government['wallet'] = await wallet.open_wallet(government['wallet_config'], government['wallet_credentials'])
+    government['did_info'] = json.dumps({'seed': government['seed']})
     print(tab + "Create DID and KEY and store in Wallet")
-    steward['did'], steward['key'] = await did.create_and_store_my_did(steward['wallet'], steward['did_info'])
+    government['did'], government['key'] = await did.create_and_store_my_did(government['wallet'], government['did_info'])
 
     print("==============================")
     print("==============================")
 
-    print("Steward -> Onboard SEC")
+    print("Government -> Onboard SEC")
     sec = {
         'name': 'SEC',
         'wallet_config': json.dumps({'id': 'sec_wallet'}),
@@ -55,16 +54,16 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print(tab + "Steward -> Establish p2p connection with SEC")
-    steward['did_for_sec'], steward['key_for_sec'], sec['did_for_steward'], sec['key_for_steward'], _ = await onboarding(steward, sec)
-    print(tab + "Steward -> Assign DID to SEC")
-    sec['did'] = await get_verinym(steward,
-                                   steward['key_for_sec'],
+    print(tab + "Government -> Establish p2p connection with SEC")
+    government['did_for_sec'], government['key_for_sec'], sec['did_for_government'], sec['key_for_government'], _ = await onboarding(government, sec)
+    print(tab + "Government -> Assign DID to SEC")
+    sec['did'] = await get_verinym(government,
+                                   government['key_for_sec'],
                                    sec,
-                                   sec['did_for_steward'],
-                                   sec['key_for_steward'])
+                                   sec['did_for_government'],
+                                   sec['key_for_government'])
 
-    print("Steward -> Onboard Auditor")
+    print("Government -> Onboard Auditor")
     auditor = {
         'name': 'Auditor',
         'wallet_config': json.dumps({'id': 'auditor_wallet'}),
@@ -72,16 +71,16 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print(tab + "Steward -> Establish p2p connection with Auditor")
-    steward['did_for_auditor'], steward['key_for_auditor'], auditor['did_for_steward'], auditor['key_for_steward'], _ = await onboarding(steward, auditor)
-    print(tab + "Steward -> Assign DID to Auditor")
-    auditor['did'] = await get_verinym(steward,
-                                       steward['key_for_auditor'],
+    print(tab + "Government -> Establish p2p connection with Auditor")
+    government['did_for_auditor'], government['key_for_auditor'], auditor['did_for_government'], auditor['key_for_government'], _ = await onboarding(government, auditor)
+    print(tab + "Government -> Assign DID to Auditor")
+    auditor['did'] = await get_verinym(government,
+                                       government['key_for_auditor'],
                                        auditor,
-                                       auditor['did_for_steward'],
-                                       auditor['key_for_steward'])
+                                       auditor['did_for_government'],
+                                       auditor['key_for_government'])
 
-    print("Steward -> Onboard Goldman Sachs")
+    print("Government -> Onboard Goldman Sachs")
     goldman_sachs = {
         'name': 'Goldman Sachs',
         'wallet_config': json.dumps({'id': 'goldman_sachs_wallet'}),
@@ -89,14 +88,14 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print(tab + "Steward -> Establish p2p connection with Goldman Sachs")
-    steward['did_for_goldman_sachs'], steward['key_for_goldman_sachs'], goldman_sachs['did_for_steward'], goldman_sachs['key_for_steward'], _ = await onboarding(steward, goldman_sachs)
-    print(tab + "Steward -> Assign DID to Goldman Sachs")
-    goldman_sachs['did'] = await get_verinym(steward,
-                                             steward['key_for_goldman_sachs'],
+    print(tab + "Government -> Establish p2p connection with Goldman Sachs")
+    government['did_for_goldman_sachs'], government['key_for_goldman_sachs'], goldman_sachs['did_for_government'], goldman_sachs['key_for_government'], _ = await onboarding(government, goldman_sachs)
+    print(tab + "Government -> Assign DID to Goldman Sachs")
+    goldman_sachs['did'] = await get_verinym(government,
+                                             government['key_for_goldman_sachs'],
                                              goldman_sachs,
-                                             goldman_sachs['did_for_steward'],
-                                             goldman_sachs['key_for_steward'])
+                                             goldman_sachs['did_for_government'],
+                                             goldman_sachs['key_for_government'])
 
     print("==============================")
 
@@ -355,9 +354,9 @@ async def run():
     print("==============================")
     print("==============================")
 
-    print("Close and Delete Steward\'s Wallet")
-    await wallet.close_wallet(steward['wallet'])
-    await wallet.delete_wallet(steward['wallet_config'], steward['wallet_credentials'])
+    print("Close and Delete government\'s Wallet")
+    await wallet.close_wallet(government['wallet'])
+    await wallet.delete_wallet(government['wallet_config'], government['wallet_credentials'])
 
     print("Close and Delete SEC\'s Wallet")
     await wallet.close_wallet(sec['wallet'])
