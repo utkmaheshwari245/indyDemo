@@ -4,9 +4,10 @@ from indy import anoncreds, crypto, did, ledger, pool, wallet
 
 import json
 
+tab = "    "
 
 async def run():
-    tab = "    ";
+
     print("============== Start Demo ==============")
 
     print("Setup Pool")
