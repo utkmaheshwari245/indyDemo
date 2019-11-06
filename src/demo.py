@@ -58,11 +58,7 @@ async def run():
     print(tab + "Government -> Establish p2p connection with SEC")
     government['did_for_sec'], government['key_for_sec'], sec['did_for_government'], sec['key_for_government'], _ = await onboarding(government, sec)
     print(tab + "Government -> Assign DID to SEC")
-    sec['did'] = await get_verinym(government,
-                                   government['key_for_sec'],
-                                   sec,
-                                   sec['did_for_government'],
-                                   sec['key_for_government'])
+    sec['did'] = await get_verinym(government, sec, 'sec')
 
     print("Government -> Onboard Auditor")
     auditor = {
@@ -75,11 +71,7 @@ async def run():
     print(tab + "Government -> Establish p2p connection with Auditor")
     government['did_for_auditor'], government['key_for_auditor'], auditor['did_for_government'], auditor['key_for_government'], _ = await onboarding(government, auditor)
     print(tab + "Government -> Assign DID to Auditor")
-    auditor['did'] = await get_verinym(government,
-                                       government['key_for_auditor'],
-                                       auditor,
-                                       auditor['did_for_government'],
-                                       auditor['key_for_government'])
+    auditor['did'] = await get_verinym(government, auditor, 'auditor')
 
     print("Government -> Onboard Goldman Sachs")
     goldman_sachs = {
@@ -92,11 +84,7 @@ async def run():
     print(tab + "Government -> Establish p2p connection with Goldman Sachs")
     government['did_for_goldman_sachs'], government['key_for_goldman_sachs'], goldman_sachs['did_for_government'], goldman_sachs['key_for_government'], _ = await onboarding(government, goldman_sachs)
     print(tab + "Government -> Assign DID to Goldman Sachs")
-    goldman_sachs['did'] = await get_verinym(government,
-                                             government['key_for_goldman_sachs'],
-                                             goldman_sachs,
-                                             goldman_sachs['did_for_government'],
-                                             goldman_sachs['key_for_government'])
+    goldman_sachs['did'] = await get_verinym(government, goldman_sachs, 'goldman_sachs')
 
     print("==============================")
 
@@ -247,8 +235,7 @@ async def run():
     print("==============================")
 
     print("Goldman Sachs -> Establish p2p connection with JP Morgan")
-    goldman_sachs['did_for_jp_morgan'], goldman_sachs['key_for_jp_morgan'], jp_morgan['did_for_goldman_sachs'], jp_morgan['key_for_goldman_sachs'], \
-    goldman_sachs['jp_morgan_connection_response'] = await onboarding(goldman_sachs, jp_morgan)
+    goldman_sachs['did_for_jp_morgan'], goldman_sachs['key_for_jp_morgan'], jp_morgan['did_for_goldman_sachs'], jp_morgan['key_for_goldman_sachs'], goldman_sachs['jp_morgan_connection_response'] = await onboarding(goldman_sachs, jp_morgan)
 
     print("Goldman Sachs -> Create KYC Credential Proof Request")
     nonce = await anoncreds.generate_nonce()
@@ -417,7 +404,11 @@ async def onboarding(_from, to):
     return from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response']
 
 
-async def get_verinym(_from, from_to_key, to, to_from_did, to_from_key):
+async def get_verinym(_from, to, name):
+    from_to_key = _from['key_for_' + name]
+    to_from_did = to['did_for_government']
+    to_from_key = to['key_for_government']
+
     (to_did, to_key) = await did.create_and_store_my_did(to['wallet'], "{}")
     to['did_info'] = json.dumps({
         'did': to_did,
