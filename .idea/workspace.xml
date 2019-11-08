@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e5620b44-0662-4777-8c6b-af869e827eff" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/demoX.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/demo.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/demo.py" afterDir="false" />
     </list>
@@ -29,7 +30,13 @@
   <component name="ProjectId" id="1SwBBKc0rnngCBXBbbwrkSr6Jv3" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="PropertiesComponent">
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/src" />
     <property name="settings.editor.selected.configurable" value="preferences.externalDependencies" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src" />
+    </key>
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">

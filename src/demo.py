@@ -27,13 +27,13 @@ async def run():
 
     print("Setup Government")
     government = {
-        'name': "Government",
+        'name': "government",
         'wallet_config': json.dumps({'id': 'government_wallet'}),
         'wallet_credentials': json.dumps({'key': 'government_wallet_key'}),
         'pool': pool_['handle'],
         'seed': '000000000000000000000000Steward1'
     }
-    print(tab + "Create Government Wallet")
+    print(tab + "Create wallet")
     try:
         await wallet.create_wallet(government['wallet_config'], government['wallet_credentials'])
     except IndyError as ex:
@@ -41,50 +41,44 @@ async def run():
             pass
     government['wallet'] = await wallet.open_wallet(government['wallet_config'], government['wallet_credentials'])
     government['did_info'] = json.dumps({'seed': government['seed']})
-    print(tab + "Create DID and KEY and store in Wallet")
+    print(tab + "Create and store did and key in wallet")
     government['did'], government['key'] = await did.create_and_store_my_did(government['wallet'], government['did_info'])
 
     print("==============================")
     print("==============================")
 
-    print("Government -> Onboard SEC")
+    print("Onboard SEC")
     sec = {
-        'name': 'SEC',
+        'name': 'sec',
         'wallet_config': json.dumps({'id': 'sec_wallet'}),
         'wallet_credentials': json.dumps({'key': 'sec_wallet_key'}),
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print(tab + "Government -> Establish p2p connection with SEC")
     government['did_for_sec'], government['key_for_sec'], sec['did_for_government'], sec['key_for_government'], _ = await onboarding(government, sec)
-    print(tab + "Government -> Assign DID to SEC")
-    sec['did'] = await get_verinym(government, sec, 'sec')
+    sec['did'] = await get_verinym(government, sec)
 
-    print("Government -> Onboard Auditor")
+    print("Onboard Auditor")
     auditor = {
-        'name': 'Auditor',
+        'name': 'auditor',
         'wallet_config': json.dumps({'id': 'auditor_wallet'}),
         'wallet_credentials': json.dumps({'key': 'auditor_wallet_key'}),
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print(tab + "Government -> Establish p2p connection with Auditor")
     government['did_for_auditor'], government['key_for_auditor'], auditor['did_for_government'], auditor['key_for_government'], _ = await onboarding(government, auditor)
-    print(tab + "Government -> Assign DID to Auditor")
-    auditor['did'] = await get_verinym(government, auditor, 'auditor')
+    auditor['did'] = await get_verinym(government, auditor)
 
-    print("Government -> Onboard Goldman Sachs")
+    print("Onboard Goldman Sachs")
     goldman_sachs = {
-        'name': 'Goldman Sachs',
+        'name': 'goldman_sachs',
         'wallet_config': json.dumps({'id': 'goldman_sachs_wallet'}),
         'wallet_credentials': json.dumps({'key': 'goldman_sachs_wallet_key'}),
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print(tab + "Government -> Establish p2p connection with Goldman Sachs")
     government['did_for_goldman_sachs'], government['key_for_goldman_sachs'], goldman_sachs['did_for_government'], goldman_sachs['key_for_government'], _ = await onboarding(government, goldman_sachs)
-    print(tab + "Government -> Assign DID to Goldman Sachs")
-    goldman_sachs['did'] = await get_verinym(government, goldman_sachs, 'goldman_sachs')
+    goldman_sachs['did'] = await get_verinym(government, goldman_sachs)
 
     print("==============================")
 
@@ -128,9 +122,9 @@ async def run():
 
     print("==============================")
 
-    print("Auditor -> Establish p2p connection with JP Morgan")
+    print("Onboard JP Morgan")
     jp_morgan = {
-        'name': 'JP Morgan',
+        'name': 'jp_morgan',
         'wallet_config': json.dumps({'id': 'jp_morgan_wallet'}),
         'wallet_credentials': json.dumps({'key': 'jp_morgan_wallet_key'}),
         'pool': pool_['handle'],
@@ -370,13 +364,22 @@ async def run():
 
 
 async def onboarding(_from, to):
-    (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], "{}")
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], from_to_did, from_to_key, None)
-    connection_request = {
-        'did': from_to_did,
-        'nonce': 123456789
-    }
 
+    print('===== Generate Pseudonym =====')
+
+    print(tab + _from['name'] + ' -> Create pairwise did and key for ' + to['name'] + ' and store in wallet')
+    (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], "{}")
+
+    print(tab + _from['name'] + ' -> Send the pairwise did and key to ledger')
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], from_to_did, from_to_key, None)
+
+    print(tab + _from['name'] + ' -> Create connection request for ' + to['name'] + ' with the pairwise did and a nonce')
+    _from['connection_request'] = {'did': from_to_did, 'nonce': 123456789}
+
+    print(tab + _from['name'] + ' -> Send connection request to ' + to['name'])
+    to['connection_request'] = _from['connection_request']
+
+    print(tab + to['name'] + ' -> Create wallet')
     if 'wallet' not in to:
         try:
             await wallet.create_wallet(to['wallet_config'], to['wallet_credentials'])
@@ -385,48 +388,70 @@ async def onboarding(_from, to):
                 pass
         to['wallet'] = await wallet.open_wallet(to['wallet_config'], to['wallet_credentials'])
 
+    print(tab + to['name'] + ' -> Create pairwise did and key for ' + _from['name'] + ' and store in wallet')
     (to_from_did, to_from_key) = await did.create_and_store_my_did(to['wallet'], "{}")
-    from_to_verkey = await did.key_for_did(_from['pool'], to['wallet'], connection_request['did'])
 
+    print(tab + to['name'] + ' -> Create connection response for ' + _from['name'] + ' with the pairwise did and key and the nonce')
     to['connection_response'] = json.dumps({
         'did': to_from_did,
         'verkey': to_from_key,
-        'nonce': connection_request['nonce']
+        'nonce': to['connection_request']['nonce']
     })
+
+    print(tab + to['name'] + ' -> Get pairwise key of ' + _from['name'] + ' from ledger')
+    from_to_verkey = await did.key_for_did(_from['pool'], to['wallet'], to['connection_request']['did'])
+
+    print(tab + to['name'] + ' -> Encrypt connection response with the pairwise key')
     to['anoncrypted_connection_response'] = await crypto.anon_crypt(from_to_verkey, to['connection_response'].encode('utf-8'))
+
+    print(tab + to['name'] + ' -> Send connection response to ' + _from['name'])
     _from['anoncrypted_connection_response'] = to['anoncrypted_connection_response']
+
+    print(tab + _from['name'] + ' -> Decrypt connection response from ' + to['name'])
     _from['connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'],
                                                                          from_to_key,
                                                                          _from['anoncrypted_connection_response'])).decode("utf-8"))
 
-    assert connection_request['nonce'] == _from['connection_response']['nonce']
+    print(tab + _from['name'] + ' -> Compare nonce in response with original nonce for validation')
+    assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
+
+    print(tab + _from['name'] + ' -> Send pairwise did and key of ' + to['name'] + ' to ledger')
     await send_nym(_from['pool'], _from['wallet'], _from['did'], to_from_did, to_from_key, None)
+
     return from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response']
 
 
-async def get_verinym(_from, to, name):
+async def get_verinym(_from, to):
+
+    print('====== Generate Verinym ======')
+
+    name = to['name']
     from_to_key = _from['key_for_' + name]
     to_from_did = to['did_for_government']
     to_from_key = to['key_for_government']
 
+    print(tab + to['name'] + ' -> Create did and key and store in wallet')
     (to_did, to_key) = await did.create_and_store_my_did(to['wallet'], "{}")
-    to['did_info'] = json.dumps({
-        'did': to_did,
-        'verkey': to_key
-    })
+
+    print(tab + to['name'] + ' -> Create did info with the did and key')
+    to['did_info'] = json.dumps({'did': to_did, 'verkey': to_key})
+
+    print(tab + to['name'] + ' -> Encrypt the did info with pairwise key of ' + _from['name'])
     to['authcrypted_did_info'] = await crypto.auth_crypt(to['wallet'], to_from_key, from_to_key, to['did_info'].encode('utf-8'))
 
+    print(tab + to['name'] + ' -> Send encrypted did info to ' + _from['name'])
+    _from['authcrypted_did_info'] = to['authcrypted_did_info']
+
+    print(tab + _from['name'] + ' -> Decrypt did info from ' + to['name'])
     sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info = await auth_decrypt(_from['wallet'],
                                                                                             from_to_key,
-                                                                                            to['authcrypted_did_info'])
+                                                                                            _from['authcrypted_did_info'])
 
+    print(tab + _from['name'] + ' -> Compare pairwise key of ' + to['name'] + ' to validate')
     assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], to_from_did)
-    await send_nym(_from['pool'],
-                   _from['wallet'],
-                   _from['did'],
-                   authdecrypted_did_info['did'],
-                   authdecrypted_did_info['verkey'],
-                   to['role'])
+
+    print(tab + _from['name'] + ' -> Send did and key of ' + to['name'] + ' to ledger')
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['verkey'], to['role'])
 
     return to_did
 
