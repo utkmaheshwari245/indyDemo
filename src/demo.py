@@ -16,13 +16,13 @@ async def run():
         'name': 'pool1',
         'config': json.dumps({"genesis_txn": '/home/indy/sandbox/pool_transactions_genesis'})
     }
-    print(tab + "Create Pool")
+    print(tab + "Create pool")
     try:
         await pool.create_pool_ledger_config(pool_['name'], pool_['config'])
     except IndyError as ex:
         if ex.error_code == ErrorCode.PoolLedgerConfigAlreadyExistsError:
             pass
-    print(tab + "Get Pool Handle")
+    print(tab + "Get pool handle")
     pool_['handle'] = await pool.open_pool_ledger(pool_['name'], None)
 
     print("Setup Government")
