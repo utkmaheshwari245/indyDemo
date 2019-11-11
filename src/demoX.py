@@ -167,6 +167,107 @@ async def run():
 
     print("==============================")
 
+    print("Onboard JP Morgan")
+    jp_morgan = {
+        'name': 'jp_morgan',
+        'wallet_config': json.dumps({'id': 'jp_morgan_wallet'}),
+        'wallet_credentials': json.dumps({'key': 'jp_morgan_wallet_key'}),
+        'pool': pool_['handle'],
+    }
+
+    general_auditor['did_for_jp_morgan'], general_auditor['key_for_jp_morgan'], jp_morgan['did_for_general_auditor'], jp_morgan['key_for_general_auditor'], general_auditor['jp_morgan_connection_response'] = await onboarding(general_auditor, jp_morgan)
+
+    print("General Auditor -> Create General KYC Credential Offer for JP Morgan")
+    general_auditor['general_kyc_cred_offer'] = await anoncreds.issuer_create_credential_offer(general_auditor['wallet'], general_auditor['general_kyc_cred_def_id'])
+
+    print("General Auditor -> Encrypt General KYC Credential Offer with JP Morgan\'s key")
+    general_auditor['jp_morgan_key_for_general_auditor'] = await did.key_for_did(general_auditor['pool'], general_auditor['wallet'], general_auditor['jp_morgan_connection_response']['did'])
+    general_auditor['authcrypted_general_kyc_cred_offer'] = await crypto.auth_crypt(general_auditor['wallet'],
+                                                                                    general_auditor['key_for_jp_morgan'],
+                                                                                    general_auditor['jp_morgan_key_for_general_auditor'],
+                                                                                    general_auditor['general_kyc_cred_offer'].encode('utf-8'))
+
+    print("General Auditor -> Send Encrypted General KYC Credential Offer to JP Morgan")
+    jp_morgan['authcrypted_general_kyc_cred_offer'] = general_auditor['authcrypted_general_kyc_cred_offer']
+
+    financial_auditor['did_for_jp_morgan'], financial_auditor['key_for_jp_morgan'], jp_morgan['did_for_financial_auditor'], jp_morgan['key_for_financial_auditor'], financial_auditor['jp_morgan_connection_response'] = await onboarding(financial_auditor, jp_morgan)
+
+    print("Financial Auditor -> Create Financial KYC Credential Offer for JP Morgan")
+    financial_auditor['financial_kyc_cred_offer'] = await anoncreds.issuer_create_credential_offer(financial_auditor['wallet'], financial_auditor['financial_kyc_cred_def_id'])
+
+    print("Financial Auditor -> Encrypt Financial KYC Credential Offer with JP Morgan\'s key")
+    financial_auditor['jp_morgan_key_for_financial_auditor'] = await did.key_for_did(financial_auditor['pool'], financial_auditor['wallet'], financial_auditor['jp_morgan_connection_response']['did'])
+    financial_auditor['authcrypted_financial_kyc_cred_offer'] = await crypto.auth_crypt(financial_auditor['wallet'],
+                                                                                        financial_auditor['key_for_jp_morgan'],
+                                                                                        financial_auditor['jp_morgan_key_for_financial_auditor'],
+                                                                                        financial_auditor['financial_kyc_cred_offer'].encode('utf-8'))
+
+    print("Financial Auditor -> Send Encrypted Financial KYC Credential Offer to JP Morgan")
+    jp_morgan['authcrypted_financial_kyc_cred_offer'] = financial_auditor['authcrypted_financial_kyc_cred_offer']
+
+    print("==============================")
+
+    print("JP Morgan -> Create and Store Master Secret in Wallet")
+    jp_morgan['master_secret_id'] = await anoncreds.prover_create_master_secret(jp_morgan['wallet'], None)
+
+    print("JP Morgan -> Decrypt General KYC Credential Offer from General Auditor")
+    jp_morgan['general_auditor_key_for_jp_morgan'], jp_morgan['general_kyc_cred_offer'], authdecrypted_general_kyc_cred_offer = await auth_decrypt(jp_morgan['wallet'],
+                                                                                                                                                   jp_morgan['key_for_general_auditor'],
+                                                                                                                                                   jp_morgan['authcrypted_general_kyc_cred_offer'])
+    jp_morgan['general_kyc_schema_id'] = authdecrypted_general_kyc_cred_offer['schema_id']
+    jp_morgan['general_kyc_cred_def_id'] = authdecrypted_general_kyc_cred_offer['cred_def_id']
+
+    print("JP Morgan -> Get General KYC Credential Definition from Ledger")
+    (jp_morgan['general_auditor_general_kyc_cred_def_id'], jp_morgan['general_auditor_general_kyc_cred_def']) = await get_cred_def(jp_morgan['pool'],
+                                                                                                                                   jp_morgan['did_for_general_auditor'],
+                                                                                                                                   authdecrypted_general_kyc_cred_offer['cred_def_id'])
+
+    print("JP Morgan -> Create General KYC Credential Request for General Auditor")
+    (jp_morgan['general_kyc_cred_request'], jp_morgan['general_kyc_cred_request_metadata']) = await anoncreds.prover_create_credential_req(jp_morgan['wallet'],
+                                                                                                                                           jp_morgan['did_for_general_auditor'],
+                                                                                                                                           jp_morgan['general_kyc_cred_offer'],
+                                                                                                                                           jp_morgan['general_auditor_general_kyc_cred_def'],
+                                                                                                                                           jp_morgan['master_secret_id'])
+
+    print("JP Morgan -> Encrypt General KYC Credential Request with General Auditor\'s key")
+    jp_morgan['authcrypted_general_kyc_cred_request'] = await crypto.auth_crypt(jp_morgan['wallet'],
+                                                                                jp_morgan['key_for_general_auditor'],
+                                                                                jp_morgan['general_auditor_key_for_jp_morgan'],
+                                                                                jp_morgan['general_kyc_cred_request'].encode('utf-8'))
+
+    print("JP Morgan -> Send encrypted General KYC Credential Request to General Auditor")
+    general_auditor['authcrypted_general_kyc_cred_request'] = jp_morgan['authcrypted_general_kyc_cred_request']
+
+    print("JP Morgan -> Decrypt Financial KYC Credential Offer from Financial Auditor")
+    jp_morgan['financial_auditor_key_for_jp_morgan'], jp_morgan['financial_kyc_cred_offer'], authdecrypted_financial_kyc_cred_offer = await auth_decrypt(jp_morgan['wallet'],
+                                                                                                                                                         jp_morgan['key_for_financial_auditor'],
+                                                                                                                                                         jp_morgan['authcrypted_financial_kyc_cred_offer'])
+    jp_morgan['financial_kyc_schema_id'] = authdecrypted_financial_kyc_cred_offer['schema_id']
+    jp_morgan['financial_kyc_cred_def_id'] = authdecrypted_financial_kyc_cred_offer['cred_def_id']
+
+    print("JP Morgan -> Get Financial KYC Credential Definition from Ledger")
+    (jp_morgan['financial_auditor_financial_kyc_cred_def_id'], jp_morgan['financial_auditor_financial_kyc_cred_def']) = await get_cred_def(jp_morgan['pool'],
+                                                                                                                                           jp_morgan['did_for_financial_auditor'],
+                                                                                                                                           authdecrypted_financial_kyc_cred_offer['cred_def_id'])
+
+    print("JP Morgan -> Create Financial KYC Credential Request for Financial Auditor")
+    (jp_morgan['financial_kyc_cred_request'], jp_morgan['financial_kyc_cred_request_metadata']) = await anoncreds.prover_create_credential_req(jp_morgan['wallet'],
+                                                                                                                                               jp_morgan['did_for_financial_auditor'],
+                                                                                                                                               jp_morgan['financial_kyc_cred_offer'],
+                                                                                                                                               jp_morgan['financial_auditor_financial_kyc_cred_def'],
+                                                                                                                                               jp_morgan['master_secret_id'])
+
+    print("JP Morgan -> Encrypt Financial KYC Credential Request with Financial Auditor\'s key")
+    jp_morgan['authcrypted_financial_kyc_cred_request'] = await crypto.auth_crypt(jp_morgan['wallet'],
+                                                                                  jp_morgan['key_for_financial_auditor'],
+                                                                                  jp_morgan['financial_auditor_key_for_jp_morgan'],
+                                                                                  jp_morgan['financial_kyc_cred_request'].encode('utf-8'))
+
+    print("JP Morgan -> Send encrypted Financial KYC Credential Request to Financial Auditor")
+    financial_auditor['authcrypted_financial_kyc_cred_request'] = jp_morgan['authcrypted_financial_kyc_cred_request']
+
+    print("==============================")
+
     print("==============================")
     print("==============================")
 
@@ -190,9 +291,9 @@ async def run():
     await wallet.close_wallet(goldman_sachs['wallet'])
     await wallet.delete_wallet(goldman_sachs['wallet_config'], goldman_sachs['wallet_credentials'])
 
-    # print("Close and Delete JP Morgan\'s Wallet")
-    # await wallet.close_wallet(jp_morgan['wallet'])
-    # await wallet.delete_wallet(jp_morgan['wallet_config'], jp_morgan['wallet_credentials'])
+    print("Close and Delete JP Morgan\'s Wallet")
+    await wallet.close_wallet(jp_morgan['wallet'])
+    await wallet.delete_wallet(jp_morgan['wallet_config'], jp_morgan['wallet_credentials'])
 
     print("Close and Delete Pool")
     await pool.close_pool_ledger(pool_['handle'])
