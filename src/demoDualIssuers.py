@@ -6,10 +6,11 @@ from indy import anoncreds, crypto, did, ledger, pool, wallet
 
 async def run():
 
-    print("============== Start Demo ==============")
+    print("========================================")
+    print("================ Set Up ================")
     print("========================================")
 
-    print("Setup Pool")
+    print("Initialize Pool")
     await pool.set_protocol_version(2) # Set protocol version 2 to work with Indy Node 1.4
     pool_ = {
         'name': 'pool1',
@@ -22,7 +23,7 @@ async def run():
             pass
     pool_['handle'] = await pool.open_pool_ledger(pool_['name'], None)
 
-    print("Setup Government")
+    print("Initialize Government")
     government = {
         'name': "government",
         'wallet_config': json.dumps({'id': 'government_wallet'}),
@@ -39,9 +40,7 @@ async def run():
     government['did_info'] = json.dumps({'seed': government['seed']})
     (government['did'], government['key']) = await did.create_and_store_my_did(government['wallet'], government['did_info'])
 
-    print("========================================")
-    print("========================================")
-
+    print('Government -> Initialize SEC')
     sec = {
         'name': 'sec',
         'wallet_config': json.dumps({'id': 'sec_wallet'}),
@@ -49,14 +48,15 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print('Government -> Establish p2p connection with SEC')
+
     (government['did_for_sec'],
      government['key_for_sec'],
      sec['did_for_government'],
      sec['key_for_government'], _) = await onboarding(government, sec)
-    print('Government -> Onboard SEC')
+
     sec['did'] = await get_verinym(government, sec)
 
+    print('Government -> Initialize General Auditor')
     general_auditor = {
         'name': 'general_auditor',
         'wallet_config': json.dumps({'id': 'general_auditor_wallet'}),
@@ -64,14 +64,15 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print('Government -> Establish p2p connection with General Auditor')
+
     (government['did_for_general_auditor'],
      government['key_for_general_auditor'],
      general_auditor['did_for_government'],
      general_auditor['key_for_government'], _) = await onboarding(government, general_auditor)
-    print('Government -> Onboard General Auditor')
+
     general_auditor['did'] = await get_verinym(government, general_auditor)
 
+    print('Government -> Initialize Financial Auditor')
     financial_auditor = {
         'name': 'financial_auditor',
         'wallet_config': json.dumps({'id': 'financial_auditor_wallet'}),
@@ -79,14 +80,15 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print('Government -> Establish p2p connection with Financial Auditor')
+
     (government['did_for_financial_auditor'],
      government['key_for_financial_auditor'],
      financial_auditor['did_for_government'],
      financial_auditor['key_for_government'], _) = await onboarding(government, financial_auditor)
-    print('Government -> Onboard Financial Auditor')
+
     financial_auditor['did'] = await get_verinym(government, financial_auditor)
 
+    print('Government -> Initialize Goldman Sachs')
     goldman_sachs = {
         'name': 'goldman_sachs',
         'wallet_config': json.dumps({'id': 'goldman_sachs_wallet'}),
@@ -94,15 +96,16 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    print('Government -> Establish p2p connection with Goldman Sachs')
+
     (government['did_for_goldman_sachs'],
      government['key_for_goldman_sachs'],
      goldman_sachs['did_for_government'],
      goldman_sachs['key_for_government'], _) = await onboarding(government, goldman_sachs)
-    print('Government -> Onboard Goldman Sachs')
+
     goldman_sachs['did'] = await get_verinym(government, goldman_sachs)
 
     print("========================================")
+    print("============== Start Demo ==============")
     print("========================================")
 
     print("SEC -> Create General KYC Credential Schema")
@@ -137,7 +140,6 @@ async def run():
 
     time.sleep(1) # sleep 1 second before getting schema
 
-    print("========================================")
     print("========================================")
 
     print("General Auditor -> Get General KYC Schema from Ledger")
@@ -184,7 +186,6 @@ async def run():
     print("Financial Auditor -> Send Financial KYC Credential Definition to Ledger")
     await send_cred_def(financial_auditor['pool'], financial_auditor['wallet'], financial_auditor['did'], financial_auditor['financial_kyc_cred_def'])
 
-    print("========================================")
     print("========================================")
 
     jp_morgan = {
@@ -239,7 +240,6 @@ async def run():
     print("Financial Auditor -> Send Encrypted Financial KYC Credential Offer to JP Morgan")
     jp_morgan['authcrypted_financial_kyc_cred_offer'] = financial_auditor['authcrypted_financial_kyc_cred_offer']
 
-    print("========================================")
     print("========================================")
 
     print("JP Morgan -> Create and Store Master Secret in Wallet")
@@ -301,7 +301,6 @@ async def run():
     print("JP Morgan -> Send encrypted Financial KYC Credential Request to Financial Auditor")
     financial_auditor['authcrypted_financial_kyc_cred_request'] = jp_morgan['authcrypted_financial_kyc_cred_request']
 
-    print("========================================")
     print("========================================")
 
     print("General Auditor -> Decrypt General KYC Credential Request from JP Morgan")
@@ -365,7 +364,6 @@ async def run():
     jp_morgan['authcrypted_financial_kyc_cred'] = financial_auditor['authcrypted_financial_kyc_cred']
 
     print("========================================")
-    print("========================================")
 
     print("JP Morgan -> Decrypt General KYC Credential from General Auditor")
     (_, jp_morgan['general_kyc_cred'], _) = await auth_decrypt(jp_morgan['wallet'],
@@ -403,7 +401,6 @@ async def run():
                                             jp_morgan['financial_kyc_cred_def'],
                                             None)
 
-    print("========================================")
     print("========================================")
 
     print("Goldman Sachs -> Establish p2p connection with JP Morgan")
@@ -498,7 +495,6 @@ async def run():
     print("Goldman Sachs -> Send encrypted Financial KYC Credential Proof Request to JP Morgan")
     jp_morgan['authcrypted_financial_kyc_cred_proof_request'] = goldman_sachs['authcrypted_financial_kyc_cred_proof_request']
 
-    print("========================================")
     print("========================================")
 
     print("JP Morgan -> Decrypt General KYC Credential Proof Request from Goldman Sachs")
@@ -608,7 +604,6 @@ async def run():
     goldman_sachs['authcrypted_financial_kyc_cred_proof'] = jp_morgan['authcrypted_financial_kyc_cred_proof']
 
     print("========================================")
-    print("========================================")
 
     print("Goldman Sachs -> Decrypt General KYC Credential Proof from JP Morgan")
     (_, goldman_sachs['general_kyc_cred_proof'], decrypted_general_kyc_cred_proof) = await auth_decrypt(goldman_sachs['wallet'],
@@ -659,7 +654,6 @@ async def run():
                                                  goldman_sachs['financial_kyc_revoc_regs'])
 
     print("========================================")
-    print("========================================")
 
     print("Close and Delete Government\'s Wallet")
     await wallet.close_wallet(government['wallet'])
@@ -689,6 +683,7 @@ async def run():
     await pool.close_pool_ledger(pool_['handle'])
     await pool.delete_pool_ledger_config(pool_['name'])
 
+    print("========================================")
     print("=============== End Demo ===============")
     print("========================================")
 
