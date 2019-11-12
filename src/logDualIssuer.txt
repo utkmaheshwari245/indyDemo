@@ -23,6 +23,7 @@ SEC -> Send Financial KYC Credential Schema to Ledger
 General Auditor -> Get General KYC Schema from Ledger
 General Auditor -> Create and Store General KYC Credential Definition in Wallet
 General Auditor -> Send General KYC Credential Definition to Ledger
+========================================
 Financial Auditor -> Get Financial KYC Schema from Ledger
 Financial Auditor -> Create and Store Financial KYC Credential Definition in Wallet
 Financial Auditor -> Send Financial KYC Credential Definition to Ledger

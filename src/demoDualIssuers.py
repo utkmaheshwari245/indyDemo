@@ -109,7 +109,7 @@ async def run():
     general_kyc = {
         'name': 'General KYC',
         'version': '1.2',
-        'attributes': ['id']
+        'attributes': ['id', 'legalName', 'legalOwner', 'primarySicCode', 'address']
     }
     (sec['general_kyc_schema_id'], sec['general_kyc_schema']) = await anoncreds.issuer_create_schema(sec['did'],
                                                                                                      general_kyc['name'],
@@ -124,7 +124,7 @@ async def run():
     financial_kyc = {
         'name': 'Financial KYC',
         'version': '1.2',
-        'attributes': ['rating']
+        'attributes': ['taxCountry', 'industryClassificationCode', 'creditRating', 'exposureCap', 'liquidity']
     }
     (sec['financial_kyc_schema_id'], sec['financial_kyc_schema']) = await anoncreds.issuer_create_schema(sec['did'],
                                                                                                          financial_kyc['name'],
@@ -310,7 +310,13 @@ async def run():
                                                                                                                               general_auditor['authcrypted_general_kyc_cred_request'])
 
     print("General Auditor -> Create General KYC Credential for JP Morgan")
-    general_auditor['jp_morgan_general_kyc_cred_values'] = json.dumps({"id": {"raw": "101", "encoded": "101"}})
+    general_auditor['jp_morgan_general_kyc_cred_values'] = json.dumps({
+        "id": {"raw": "101", "encoded": "101"},
+        "legalName": {"raw": "JP Morgan Coop.", "encoded": "00010203040506070809"},
+        "legalOwner": {"raw": "Mr. Morgan", "encoded": "10111213141516171819"},
+        "primarySicCode": {"raw": "1102", "encoded": "1102"},
+        "address": {"raw": "207A, Mulberry Woods, New York", "encoded": "20212223242526272829"}
+    })
     general_auditor['general_kyc_cred'], _, _ = await anoncreds.issuer_create_credential(general_auditor['wallet'],
                                                                                          general_auditor['general_kyc_cred_offer'],
                                                                                          general_auditor['general_kyc_cred_request'],
@@ -335,7 +341,13 @@ async def run():
                                                                                                                                       financial_auditor['authcrypted_financial_kyc_cred_request'])
 
     print("Financial Auditor -> Create Financial KYC Credential for JP Morgan")
-    financial_auditor['jp_morgan_financial_kyc_cred_values'] = json.dumps({"rating": {"raw": "5", "encoded": "5"}})
+    financial_auditor['jp_morgan_financial_kyc_cred_values'] = json.dumps({
+        "taxCountry": {"raw": "U.S.A.", "encoded": "30313233343536373839"},
+        "industryClassificationCode": {"raw": "3452", "encoded": "3452"},
+        "creditRating": {"raw": "4", "encoded": "4"},
+        "exposureCap": {"raw": "0.5", "encoded": "0.5"},
+        "liquidity": {"raw": "2.8", "encoded": "2.8"}
+    })
     financial_auditor['financial_kyc_cred'], _, _ = await anoncreds.issuer_create_credential(financial_auditor['wallet'],
                                                                                              financial_auditor['financial_kyc_cred_offer'],
                                                                                              financial_auditor['financial_kyc_cred_request'],
@@ -416,6 +428,22 @@ async def run():
             'attr1_referent': {
                 'name': 'id',
                 'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+            },
+            'attr2_referent': {
+                'name': 'legalName',
+                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+            },
+            'attr3_referent': {
+                'name': 'legalOwner',
+                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+            },
+            'attr4_referent': {
+                'name': 'primarySicCode',
+                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+            },
+            'attr5_referent': {
+                'name': 'address',
+                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
             }
         },
         'requested_predicates': {}
@@ -437,8 +465,24 @@ async def run():
         'name': 'Financial KYC Credential',
         'version': '0.1',
         'requested_attributes': {
-            'attr2_referent': {
-                'name': 'rating',
+            'attr6_referent': {
+                'name': 'taxCountry',
+                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
+            },
+            'attr7_referent': {
+                'name': 'industryClassificationCode',
+                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
+            },
+            'attr8_referent': {
+                'name': 'creditRating',
+                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
+            },
+            'attr9_referent': {
+                'name': 'exposureCap',
+                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
+            },
+            'attr10_referent': {
+                'name': 'liquidity',
                 'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
             }
         },
@@ -467,8 +511,16 @@ async def run():
                                                                                                         jp_morgan['general_kyc_cred_proof_request'],
                                                                                                         None)
     cred_for_attr1 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr1_referent')
+    cred_for_attr2 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr2_referent')
+    cred_for_attr3 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr3_referent')
+    cred_for_attr4 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr4_referent')
+    cred_for_attr5 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr5_referent')
     await anoncreds.prover_close_credentials_search_for_proof_req(search_for_general_kyc_cred_proof_request)
-    jp_morgan['creds_for_general_kyc_cred_proof'] = {cred_for_attr1['referent']: cred_for_attr1}
+    jp_morgan['creds_for_general_kyc_cred_proof'] = {cred_for_attr1['referent']: cred_for_attr1,
+                                                     cred_for_attr2['referent']: cred_for_attr2,
+                                                     cred_for_attr3['referent']: cred_for_attr3,
+                                                     cred_for_attr4['referent']: cred_for_attr4,
+                                                     cred_for_attr5['referent']: cred_for_attr5}
     jp_morgan['general_kyc_schemas'], jp_morgan['general_kyc_cred_defs'], jp_morgan['general_kyc_revoc_states'] = await prover_get_entities_from_ledger(jp_morgan['pool'],
                                                                                                                                                         jp_morgan['did_for_goldman_sachs'],
                                                                                                                                                         jp_morgan['creds_for_general_kyc_cred_proof'])
@@ -476,7 +528,11 @@ async def run():
     print("JP Morgan -> Create General KYC Credential Proof")
     jp_morgan['general_kyc_cred_requested_creds'] = json.dumps({
         'self_attested_attributes': {},
-        'requested_attributes': {'attr1_referent': {'cred_id': cred_for_attr1['referent'], 'revealed': True}},
+        'requested_attributes': {'attr1_referent': {'cred_id': cred_for_attr1['referent'], 'revealed': True},
+                                 'attr2_referent': {'cred_id': cred_for_attr2['referent'], 'revealed': True},
+                                 'attr3_referent': {'cred_id': cred_for_attr3['referent'], 'revealed': True},
+                                 'attr4_referent': {'cred_id': cred_for_attr4['referent'], 'revealed': True},
+                                 'attr5_referent': {'cred_id': cred_for_attr5['referent'], 'revealed': True}},
         'requested_predicates': {}
     })
     jp_morgan['general_kyc_cred_proof'] = await anoncreds.prover_create_proof(jp_morgan['wallet'],
@@ -505,9 +561,17 @@ async def run():
     search_for_financial_kyc_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(jp_morgan['wallet'],
                                                                                                           jp_morgan['financial_kyc_cred_proof_request'],
                                                                                                           None)
-    cred_for_attr2 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr2_referent')
+    cred_for_attr6 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr6_referent')
+    cred_for_attr7 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr7_referent')
+    cred_for_attr8 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr8_referent')
+    cred_for_attr9 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr9_referent')
+    cred_for_attr10 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr10_referent')
     await anoncreds.prover_close_credentials_search_for_proof_req(search_for_financial_kyc_cred_proof_request)
-    jp_morgan['creds_for_financial_kyc_cred_proof'] = {cred_for_attr2['referent']: cred_for_attr2}
+    jp_morgan['creds_for_financial_kyc_cred_proof'] = {cred_for_attr6['referent']: cred_for_attr6,
+                                                       cred_for_attr7['referent']: cred_for_attr7,
+                                                       cred_for_attr8['referent']: cred_for_attr8,
+                                                       cred_for_attr9['referent']: cred_for_attr9,
+                                                       cred_for_attr10['referent']: cred_for_attr10}
     jp_morgan['financial_kyc_schemas'], jp_morgan['financial_kyc_cred_defs'], jp_morgan['financial_kyc_revoc_states'] = await prover_get_entities_from_ledger(jp_morgan['pool'],
                                                                                                                                                               jp_morgan['did_for_goldman_sachs'],
                                                                                                                                                               jp_morgan['creds_for_financial_kyc_cred_proof'])
@@ -515,7 +579,11 @@ async def run():
     print("JP Morgan -> Create Financial KYC Credential Proof")
     jp_morgan['financial_kyc_cred_requested_creds'] = json.dumps({
         'self_attested_attributes': {},
-        'requested_attributes': {'attr2_referent': {'cred_id': cred_for_attr2['referent'], 'revealed': True}},
+        'requested_attributes': {'attr6_referent': {'cred_id': cred_for_attr6['referent'], 'revealed': True},
+                                 'attr7_referent': {'cred_id': cred_for_attr7['referent'], 'revealed': True},
+                                 'attr8_referent': {'cred_id': cred_for_attr8['referent'], 'revealed': True},
+                                 'attr9_referent': {'cred_id': cred_for_attr9['referent'], 'revealed': True},
+                                 'attr10_referent': {'cred_id': cred_for_attr10['referent'], 'revealed': True}},
         'requested_predicates': {}
     })
     jp_morgan['financial_kyc_cred_proof'] = await anoncreds.prover_create_proof(jp_morgan['wallet'],
@@ -551,6 +619,10 @@ async def run():
 
     print("Goldman Sachs -> Verify General KYC Credential Proof from JP Morgan")
     assert '101' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr1_referent']['raw']
+    assert 'JP Morgan Coop.' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
+    assert 'Mr. Morgan' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr3_referent']['raw']
+    assert '1102' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
+    assert '207A, Mulberry Woods, New York' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr5_referent']['raw']
     assert await anoncreds.verifier_verify_proof(goldman_sachs['general_kyc_cred_proof_request'],
                                                  goldman_sachs['general_kyc_cred_proof'],
                                                  goldman_sachs['general_kyc_schemas'],
@@ -570,7 +642,11 @@ async def run():
                                                                                           decrypted_financial_kyc_cred_proof['identifiers'])
 
     print("Goldman Sachs -> Verify Financial KYC Credential Proof from JP Morgan")
-    assert '5' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
+    assert 'U.S.A.' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr6_referent']['raw']
+    assert '3452' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr7_referent']['raw']
+    assert '4' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr8_referent']['raw']
+    assert '0.5' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr9_referent']['raw']
+    assert '2.8' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr10_referent']['raw']
     assert await anoncreds.verifier_verify_proof(goldman_sachs['financial_kyc_cred_proof_request'],
                                                  goldman_sachs['financial_kyc_cred_proof'],
                                                  goldman_sachs['financial_kyc_schemas'],
