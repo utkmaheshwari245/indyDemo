@@ -4,8 +4,6 @@ import json
 
 from indy import anoncreds, crypto, did, ledger, pool, wallet
 
-tab = "    "
-
 async def run():
 
     print("============== Start Demo ==============")
@@ -17,13 +15,11 @@ async def run():
         'name': 'pool1',
         'config': json.dumps({"genesis_txn": '/home/indy/sandbox/pool_transactions_genesis'})
     }
-    print(tab + "Create pool")
     try:
         await pool.create_pool_ledger_config(pool_['name'], pool_['config'])
     except IndyError as ex:
         if ex.error_code == ErrorCode.PoolLedgerConfigAlreadyExistsError:
             pass
-    print(tab + "Get pool handle")
     pool_['handle'] = await pool.open_pool_ledger(pool_['name'], None)
 
     print("Setup Government")
@@ -34,7 +30,6 @@ async def run():
         'pool': pool_['handle'],
         'seed': '000000000000000000000000Steward1'
     }
-    print(tab + "Create wallet")
     try:
         await wallet.create_wallet(government['wallet_config'], government['wallet_credentials'])
     except IndyError as ex:
@@ -42,13 +37,11 @@ async def run():
             pass
     government['wallet'] = await wallet.open_wallet(government['wallet_config'], government['wallet_credentials'])
     government['did_info'] = json.dumps({'seed': government['seed']})
-    print(tab + "Create and store did and key in wallet")
     government['did'], government['key'] = await did.create_and_store_my_did(government['wallet'], government['did_info'])
 
-    print("==============================")
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
-    print("Onboard SEC")
     sec = {
         'name': 'sec',
         'wallet_config': json.dumps({'id': 'sec_wallet'}),
@@ -56,10 +49,11 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    print('Government -> Establish p2p connection with SEC')
     government['did_for_sec'], government['key_for_sec'], sec['did_for_government'], sec['key_for_government'], _ = await onboarding(government, sec)
+    print('Government -> Onboard SEC')
     sec['did'] = await get_verinym(government, sec)
 
-    print("Onboard General Auditor")
     general_auditor = {
         'name': 'general_auditor',
         'wallet_config': json.dumps({'id': 'general_auditor_wallet'}),
@@ -67,10 +61,11 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    print('Government -> Establish p2p connection with General Auditor')
     government['did_for_general_auditor'], government['key_for_general_auditor'], general_auditor['did_for_government'], general_auditor['key_for_government'], _ = await onboarding(government, general_auditor)
+    print('Government -> Onboard General Auditor')
     general_auditor['did'] = await get_verinym(government, general_auditor)
 
-    print("Onboard Financial Auditor")
     financial_auditor = {
         'name': 'financial_auditor',
         'wallet_config': json.dumps({'id': 'financial_auditor_wallet'}),
@@ -78,10 +73,11 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    print('Government -> Establish p2p connection with Financial Auditor')
     government['did_for_financial_auditor'], government['key_for_financial_auditor'], financial_auditor['did_for_government'], financial_auditor['key_for_government'], _ = await onboarding(government, financial_auditor)
+    print('Government -> Onboard Financial Auditor')
     financial_auditor['did'] = await get_verinym(government, financial_auditor)
 
-    print("Onboard Goldman Sachs")
     goldman_sachs = {
         'name': 'goldman_sachs',
         'wallet_config': json.dumps({'id': 'goldman_sachs_wallet'}),
@@ -89,11 +85,13 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    print('Government -> Establish p2p connection with Goldman Sachs')
     government['did_for_goldman_sachs'], government['key_for_goldman_sachs'], goldman_sachs['did_for_government'], goldman_sachs['key_for_government'], _ = await onboarding(government, goldman_sachs)
+    print('Government -> Onboard Goldman Sachs')
     goldman_sachs['did'] = await get_verinym(government, goldman_sachs)
 
-    print("==============================")
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("SEC -> Create General KYC Credential Schema")
     general_kyc = {
@@ -127,7 +125,8 @@ async def run():
 
     time.sleep(1) # sleep 1 second before getting schema
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("General Auditor -> Get General KYC Schema from Ledger")
     (general_auditor['general_kyc_schema_id'], general_auditor['general_kyc_schema']) = await get_schema(general_auditor['pool'], general_auditor['did'], general_kyc_schema_id)
@@ -167,7 +166,8 @@ async def run():
     print("Financial Auditor -> Send Financial KYC Credential Definition to Ledger")
     await send_cred_def(financial_auditor['pool'], financial_auditor['wallet'], financial_auditor['did'], financial_auditor['financial_kyc_cred_def'])
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     jp_morgan = {
         'name': 'jp_morgan',
@@ -175,7 +175,6 @@ async def run():
         'wallet_credentials': json.dumps({'key': 'jp_morgan_wallet_key'}),
         'pool': pool_['handle'],
     }
-
     print("General Auditor -> Establish p2p connection with JP Morgan")
     general_auditor['did_for_jp_morgan'], general_auditor['key_for_jp_morgan'], jp_morgan['did_for_general_auditor'], jp_morgan['key_for_general_auditor'], general_auditor['jp_morgan_connection_response'] = await onboarding(general_auditor, jp_morgan)
 
@@ -191,6 +190,8 @@ async def run():
 
     print("General Auditor -> Send Encrypted General KYC Credential Offer to JP Morgan")
     jp_morgan['authcrypted_general_kyc_cred_offer'] = general_auditor['authcrypted_general_kyc_cred_offer']
+
+    print("========================================")
 
     print("Financial Auditor -> Establish p2p connection with JP Morgan")
     financial_auditor['did_for_jp_morgan'], financial_auditor['key_for_jp_morgan'], jp_morgan['did_for_financial_auditor'], jp_morgan['key_for_financial_auditor'], financial_auditor['jp_morgan_connection_response'] = await onboarding(financial_auditor, jp_morgan)
@@ -208,7 +209,8 @@ async def run():
     print("Financial Auditor -> Send Encrypted Financial KYC Credential Offer to JP Morgan")
     jp_morgan['authcrypted_financial_kyc_cred_offer'] = financial_auditor['authcrypted_financial_kyc_cred_offer']
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("JP Morgan -> Create and Store Master Secret in Wallet")
     jp_morgan['master_secret_id'] = await anoncreds.prover_create_master_secret(jp_morgan['wallet'], None)
@@ -269,7 +271,8 @@ async def run():
     print("JP Morgan -> Send encrypted Financial KYC Credential Request to Financial Auditor")
     financial_auditor['authcrypted_financial_kyc_cred_request'] = jp_morgan['authcrypted_financial_kyc_cred_request']
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("General Auditor -> Decrypt General KYC Credential Request from JP Morgan")
     general_auditor['jp_morgan_key_for_general_auditor'], general_auditor['general_kyc_cred_request'], _ = await auth_decrypt(general_auditor['wallet'],
@@ -294,6 +297,8 @@ async def run():
     print("General Auditor -> Send encrypted General KYC Credential to JP Morgan")
     jp_morgan['authcrypted_general_kyc_cred'] = general_auditor['authcrypted_general_kyc_cred']
 
+    print("========================================")
+
     print("Financial Auditor -> Decrypt Financial KYC Credential Request from JP Morgan")
     financial_auditor['jp_morgan_key_for_financial_auditor'], financial_auditor['financial_kyc_cred_request'], _ = await auth_decrypt(financial_auditor['wallet'],
                                                                                                                                       financial_auditor['key_for_jp_morgan'],
@@ -317,7 +322,8 @@ async def run():
     print("Financial Auditor -> Send encrypted Financial KYC Credential to JP Morgan")
     jp_morgan['authcrypted_financial_kyc_cred'] = financial_auditor['authcrypted_financial_kyc_cred']
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("JP Morgan -> Decrypt General KYC Credential from General Auditor")
     _, jp_morgan['general_kyc_cred'], _ = await auth_decrypt(jp_morgan['wallet'],
@@ -355,7 +361,8 @@ async def run():
                                             jp_morgan['financial_kyc_cred_def'],
                                             None)
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("Goldman Sachs -> Establish p2p connection with JP Morgan")
     goldman_sachs['did_for_jp_morgan'], goldman_sachs['key_for_jp_morgan'], jp_morgan['did_for_goldman_sachs'], jp_morgan['key_for_goldman_sachs'], goldman_sachs['jp_morgan_connection_response'] = await onboarding(goldman_sachs, jp_morgan)
@@ -413,7 +420,8 @@ async def run():
     print("Goldman Sachs -> Send encrypted Financial KYC Credential Proof Request to JP Morgan")
     jp_morgan['authcrypted_financial_kyc_cred_proof_request'] = goldman_sachs['authcrypted_financial_kyc_cred_proof_request']
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("JP Morgan -> Decrypt General KYC Credential Proof Request from Goldman Sachs")
     jp_morgan['goldman_sachs_key_for_jp_morgan'], jp_morgan['general_kyc_cred_proof_request'], _ = await auth_decrypt(jp_morgan['wallet'],
@@ -493,7 +501,8 @@ async def run():
     print("JP Morgan -> Send encrypted Financial KYC Credential Proof to Goldman Sachs")
     goldman_sachs['authcrypted_financial_kyc_cred_proof'] = jp_morgan['authcrypted_financial_kyc_cred_proof']
 
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("Goldman Sachs -> Decrypt General KYC Credential Proof from JP Morgan")
     _, goldman_sachs['general_kyc_cred_proof'], decrypted_general_kyc_cred_proof = await auth_decrypt(goldman_sachs['wallet'],
@@ -529,8 +538,8 @@ async def run():
                                                  goldman_sachs['financial_kyc_revoc_ref_defs'],
                                                  goldman_sachs['financial_kyc_revoc_regs'])
 
-    print("==============================")
-    print("==============================")
+    print("========================================")
+    print("========================================")
 
     print("Close and Delete Government\'s Wallet")
     await wallet.close_wallet(government['wallet'])
@@ -560,99 +569,68 @@ async def run():
     await pool.close_pool_ledger(pool_['handle'])
     await pool.delete_pool_ledger_config(pool_['name'])
 
-    print("============== Finish Demo ==============")
-    print("=========================================")
+    print("=============== End Demo ===============")
+    print("========================================")
 
 
-async def onboarding(_from, to):
+async def onboarding(_from, _to):
 
-    print('===== Generate Pseudonym =====')
-
-    print(tab + _from['name'] + ' -> Create pairwise did and key for ' + to['name'] + ' and store in wallet')
     (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], "{}")
 
-    print(tab + _from['name'] + ' -> Send the pairwise did and key to ledger')
     await send_nym(_from['pool'], _from['wallet'], _from['did'], from_to_did, from_to_key, None)
 
-    print(tab + _from['name'] + ' -> Create connection request for ' + to['name'] + ' with the pairwise did and a nonce')
     _from['connection_request'] = {'did': from_to_did, 'nonce': 123456789}
+    _to['connection_request'] = _from['connection_request']
 
-    print(tab + _from['name'] + ' -> Send connection request to ' + to['name'])
-    to['connection_request'] = _from['connection_request']
-
-    print(tab + to['name'] + ' -> Create wallet')
-    if 'wallet' not in to:
+    if 'wallet' not in _to:
         try:
-            await wallet.create_wallet(to['wallet_config'], to['wallet_credentials'])
+            await wallet.create_wallet(_to['wallet_config'], _to['wallet_credentials'])
         except IndyError as ex:
             if ex.error_code == ErrorCode.PoolLedgerConfigAlreadyExistsError:
                 pass
-        to['wallet'] = await wallet.open_wallet(to['wallet_config'], to['wallet_credentials'])
+        _to['wallet'] = await wallet.open_wallet(_to['wallet_config'], _to['wallet_credentials'])
 
-    print(tab + to['name'] + ' -> Create pairwise did and key for ' + _from['name'] + ' and store in wallet')
-    (to_from_did, to_from_key) = await did.create_and_store_my_did(to['wallet'], "{}")
+    (to_from_did, to_from_key) = await did.create_and_store_my_did(_to['wallet'], "{}")
 
-    print(tab + to['name'] + ' -> Create connection response for ' + _from['name'] + ' with the pairwise did and key and the nonce')
-    to['connection_response'] = json.dumps({
+    _to['connection_response'] = json.dumps({
         'did': to_from_did,
         'verkey': to_from_key,
-        'nonce': to['connection_request']['nonce']
+        'nonce': _to['connection_request']['nonce']
     })
 
-    print(tab + to['name'] + ' -> Get pairwise key of ' + _from['name'] + ' from ledger')
-    from_to_verkey = await did.key_for_did(_from['pool'], to['wallet'], to['connection_request']['did'])
+    from_to_verkey = await did.key_for_did(_from['pool'], _to['wallet'], _to['connection_request']['did'])
 
-    print(tab + to['name'] + ' -> Encrypt connection response with the pairwise key')
-    to['anoncrypted_connection_response'] = await crypto.anon_crypt(from_to_verkey, to['connection_response'].encode('utf-8'))
-
-    print(tab + to['name'] + ' -> Send connection response to ' + _from['name'])
-    _from['anoncrypted_connection_response'] = to['anoncrypted_connection_response']
-
-    print(tab + _from['name'] + ' -> Decrypt connection response from ' + to['name'])
+    _to['anoncrypted_connection_response'] = await crypto.anon_crypt(from_to_verkey, _to['connection_response'].encode('utf-8'))
+    _from['anoncrypted_connection_response'] = _to['anoncrypted_connection_response']
     _from['connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'],
                                                                          from_to_key,
                                                                          _from['anoncrypted_connection_response'])).decode("utf-8"))
 
-    print(tab + _from['name'] + ' -> Compare nonce in response with original nonce for validation')
     assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
-
-    print(tab + _from['name'] + ' -> Send pairwise did and key of ' + to['name'] + ' to ledger')
     await send_nym(_from['pool'], _from['wallet'], _from['did'], to_from_did, to_from_key, None)
 
     return from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response']
 
 
-async def get_verinym(_from, to):
+async def get_verinym(_from, _to):
 
-    print('====== Generate Verinym ======')
-
-    name = to['name']
+    name = _to['name']
     from_to_key = _from['key_for_' + name]
-    to_from_did = to['did_for_government']
-    to_from_key = to['key_for_government']
+    to_from_did = _to['did_for_government']
+    to_from_key = _to['key_for_government']
 
-    print(tab + to['name'] + ' -> Create did and key and store in wallet')
-    (to_did, to_key) = await did.create_and_store_my_did(to['wallet'], "{}")
+    (to_did, to_key) = await did.create_and_store_my_did(_to['wallet'], "{}")
 
-    print(tab + to['name'] + ' -> Create did info with the did and key')
-    to['did_info'] = json.dumps({'did': to_did, 'verkey': to_key})
+    _to['did_info'] = json.dumps({'did': to_did, 'verkey': to_key})
+    _to['authcrypted_did_info'] = await crypto.auth_crypt(_to['wallet'], to_from_key, from_to_key, _to['did_info'].encode('utf-8'))
+    _from['authcrypted_did_info'] = _to['authcrypted_did_info']
 
-    print(tab + to['name'] + ' -> Encrypt the did info with pairwise key of ' + _from['name'])
-    to['authcrypted_did_info'] = await crypto.auth_crypt(to['wallet'], to_from_key, from_to_key, to['did_info'].encode('utf-8'))
-
-    print(tab + to['name'] + ' -> Send encrypted did info to ' + _from['name'])
-    _from['authcrypted_did_info'] = to['authcrypted_did_info']
-
-    print(tab + _from['name'] + ' -> Decrypt did info from ' + to['name'])
     sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info = await auth_decrypt(_from['wallet'],
                                                                                             from_to_key,
                                                                                             _from['authcrypted_did_info'])
 
-    print(tab + _from['name'] + ' -> Compare pairwise key of ' + to['name'] + ' to validate')
     assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], to_from_did)
-
-    print(tab + _from['name'] + ' -> Send did and key of ' + to['name'] + ' to ledger')
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['verkey'], to['role'])
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['verkey'], _to['role'])
 
     return to_did
 
