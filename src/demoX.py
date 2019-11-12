@@ -9,6 +9,7 @@ tab = "    "
 async def run():
 
     print("============== Start Demo ==============")
+    print("========================================")
 
     print("Setup Pool")
     await pool.set_protocol_version(2) # Set protocol version 2 to work with Indy Node 1.4
@@ -92,6 +93,7 @@ async def run():
     goldman_sachs['did'] = await get_verinym(government, goldman_sachs)
 
     print("==============================")
+    print("==============================")
 
     print("SEC -> Create General KYC Credential Schema")
     general_kyc = {
@@ -167,7 +169,6 @@ async def run():
 
     print("==============================")
 
-    print("Onboard JP Morgan")
     jp_morgan = {
         'name': 'jp_morgan',
         'wallet_config': json.dumps({'id': 'jp_morgan_wallet'}),
@@ -175,6 +176,7 @@ async def run():
         'pool': pool_['handle'],
     }
 
+    print("General Auditor -> Establish p2p connection with JP Morgan")
     general_auditor['did_for_jp_morgan'], general_auditor['key_for_jp_morgan'], jp_morgan['did_for_general_auditor'], jp_morgan['key_for_general_auditor'], general_auditor['jp_morgan_connection_response'] = await onboarding(general_auditor, jp_morgan)
 
     print("General Auditor -> Create General KYC Credential Offer for JP Morgan")
@@ -190,6 +192,7 @@ async def run():
     print("General Auditor -> Send Encrypted General KYC Credential Offer to JP Morgan")
     jp_morgan['authcrypted_general_kyc_cred_offer'] = general_auditor['authcrypted_general_kyc_cred_offer']
 
+    print("Financial Auditor -> Establish p2p connection with JP Morgan")
     financial_auditor['did_for_jp_morgan'], financial_auditor['key_for_jp_morgan'], jp_morgan['did_for_financial_auditor'], jp_morgan['key_for_financial_auditor'], financial_auditor['jp_morgan_connection_response'] = await onboarding(financial_auditor, jp_morgan)
 
     print("Financial Auditor -> Create Financial KYC Credential Offer for JP Morgan")
@@ -357,6 +360,7 @@ async def run():
     print("Goldman Sachs -> Establish p2p connection with JP Morgan")
     goldman_sachs['did_for_jp_morgan'], goldman_sachs['key_for_jp_morgan'], jp_morgan['did_for_goldman_sachs'], jp_morgan['key_for_goldman_sachs'], goldman_sachs['jp_morgan_connection_response'] = await onboarding(goldman_sachs, jp_morgan)
 
+    print("Goldman Sachs -> Get JP Morgan\'s key")
     goldman_sachs['jp_morgan_key_for_goldman_sachs'] = await did.key_for_did(goldman_sachs['pool'],
                                                                              goldman_sachs['wallet'],
                                                                              goldman_sachs['jp_morgan_connection_response']['did'])
@@ -420,34 +424,12 @@ async def run():
     search_for_general_kyc_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(jp_morgan['wallet'],
                                                                                                         jp_morgan['general_kyc_cred_proof_request'],
                                                                                                         None)
-
-    print("JP Morgan -> Decrypt Financial KYC Credential Proof Request from Goldman Sachs")
-    jp_morgan['goldman_sachs_key_for_jp_morgan'], jp_morgan['financial_kyc_cred_proof_request'], _ = await auth_decrypt(jp_morgan['wallet'],
-                                                                                                                        jp_morgan['key_for_goldman_sachs'],
-                                                                                                                        jp_morgan['authcrypted_financial_kyc_cred_proof_request'])
-
-    print("JP Morgan -> Get credentials for Financial KYC Credential Proof Request")
-    search_for_financial_kyc_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(jp_morgan['wallet'],
-                                                                                                          jp_morgan['financial_kyc_cred_proof_request'],
-                                                                                                          None)
-
     cred_for_attr1 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr1_referent')
     await anoncreds.prover_close_credentials_search_for_proof_req(search_for_general_kyc_cred_proof_request)
-
-    cred_for_attr2 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr2_referent')
-    await anoncreds.prover_close_credentials_search_for_proof_req(search_for_financial_kyc_cred_proof_request)
-
-
     jp_morgan['creds_for_general_kyc_cred_proof'] = {cred_for_attr1['referent']: cred_for_attr1}
-    jp_morgan['creds_for_financial_kyc_cred_proof'] = {cred_for_attr2['referent']: cred_for_attr2}
-
     jp_morgan['general_kyc_schemas'], jp_morgan['general_kyc_cred_defs'], jp_morgan['general_kyc_revoc_states'] = await prover_get_entities_from_ledger(jp_morgan['pool'],
                                                                                                                                                         jp_morgan['did_for_goldman_sachs'],
                                                                                                                                                         jp_morgan['creds_for_general_kyc_cred_proof'])
-
-    jp_morgan['financial_kyc_schemas'], jp_morgan['financial_kyc_cred_defs'], jp_morgan['financial_kyc_revoc_states'] = await prover_get_entities_from_ledger(jp_morgan['pool'],
-                                                                                                                                                              jp_morgan['did_for_goldman_sachs'],
-                                                                                                                                                              jp_morgan['creds_for_financial_kyc_cred_proof'])
 
     print("JP Morgan -> Create General KYC Credential Proof")
     jp_morgan['general_kyc_cred_requested_creds'] = json.dumps({
@@ -463,6 +445,31 @@ async def run():
                                                                               jp_morgan['general_kyc_cred_defs'],
                                                                               jp_morgan['general_kyc_revoc_states'])
 
+    print("JP Morgan -> Encrypt General KYC Credential Proof for Goldman Sachs")
+    jp_morgan['authcrypted_general_kyc_cred_proof'] = await crypto.auth_crypt(jp_morgan['wallet'],
+                                                                              jp_morgan['key_for_goldman_sachs'],
+                                                                              jp_morgan['goldman_sachs_key_for_jp_morgan'],
+                                                                              jp_morgan['general_kyc_cred_proof'].encode('utf-8'))
+
+    print("JP Morgan -> Send encrypted General KYC Credential Proof to Goldman Sachs")
+    goldman_sachs['authcrypted_general_kyc_cred_proof'] = jp_morgan['authcrypted_general_kyc_cred_proof']
+
+    print("JP Morgan -> Decrypt Financial KYC Credential Proof Request from Goldman Sachs")
+    jp_morgan['goldman_sachs_key_for_jp_morgan'], jp_morgan['financial_kyc_cred_proof_request'], _ = await auth_decrypt(jp_morgan['wallet'],
+                                                                                                                        jp_morgan['key_for_goldman_sachs'],
+                                                                                                                        jp_morgan['authcrypted_financial_kyc_cred_proof_request'])
+
+    print("JP Morgan -> Get credentials for Financial KYC Credential Proof Request")
+    search_for_financial_kyc_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(jp_morgan['wallet'],
+                                                                                                          jp_morgan['financial_kyc_cred_proof_request'],
+                                                                                                          None)
+    cred_for_attr2 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr2_referent')
+    await anoncreds.prover_close_credentials_search_for_proof_req(search_for_financial_kyc_cred_proof_request)
+    jp_morgan['creds_for_financial_kyc_cred_proof'] = {cred_for_attr2['referent']: cred_for_attr2}
+    jp_morgan['financial_kyc_schemas'], jp_morgan['financial_kyc_cred_defs'], jp_morgan['financial_kyc_revoc_states'] = await prover_get_entities_from_ledger(jp_morgan['pool'],
+                                                                                                                                                              jp_morgan['did_for_goldman_sachs'],
+                                                                                                                                                              jp_morgan['creds_for_financial_kyc_cred_proof'])
+
     print("JP Morgan -> Create Financial KYC Credential Proof")
     jp_morgan['financial_kyc_cred_requested_creds'] = json.dumps({
         'self_attested_attributes': {},
@@ -476,15 +483,6 @@ async def run():
                                                                                 jp_morgan['financial_kyc_schemas'],
                                                                                 jp_morgan['financial_kyc_cred_defs'],
                                                                                 jp_morgan['financial_kyc_revoc_states'])
-
-    print("JP Morgan -> Encrypt General KYC Credential Proof for Goldman Sachs")
-    jp_morgan['authcrypted_general_kyc_cred_proof'] = await crypto.auth_crypt(jp_morgan['wallet'],
-                                                                              jp_morgan['key_for_goldman_sachs'],
-                                                                              jp_morgan['goldman_sachs_key_for_jp_morgan'],
-                                                                              jp_morgan['general_kyc_cred_proof'].encode('utf-8'))
-
-    print("JP Morgan -> Send encrypted General KYC Credential Proof to Goldman Sachs")
-    goldman_sachs['authcrypted_general_kyc_cred_proof'] = jp_morgan['authcrypted_general_kyc_cred_proof']
 
     print("JP Morgan -> Encrypt Financial KYC Credential Proof for Goldman Sachs")
     jp_morgan['authcrypted_financial_kyc_cred_proof'] = await crypto.auth_crypt(jp_morgan['wallet'],
@@ -563,6 +561,7 @@ async def run():
     await pool.delete_pool_ledger_config(pool_['name'])
 
     print("============== Finish Demo ==============")
+    print("=========================================")
 
 
 async def onboarding(_from, to):
