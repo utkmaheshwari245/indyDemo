@@ -1,7 +1,7 @@
 ============== Start Demo ==============
 Setup Pool
-    Create Pool
-    Get Pool Handle
+    Create pool
+    Get pool handle
 Setup Government
     Create wallet
     Create and store did and key in wallet

@@ -1,0 +1,110 @@
+============== Start Demo ==============
+========================================
+Setup Pool
+Setup Government
+========================================
+========================================
+Government -> Establish p2p connection with SEC
+Government -> Onboard SEC
+Government -> Establish p2p connection with General Auditor
+Government -> Onboard General Auditor
+Government -> Establish p2p connection with Financial Auditor
+Government -> Onboard Financial Auditor
+Government -> Establish p2p connection with Goldman Sachs
+Government -> Onboard Goldman Sachs
+========================================
+========================================
+SEC -> Create General KYC Credential Schema
+SEC -> Send General KYC Credential Schema to Ledger
+SEC -> Create Financial KYC Credential Schema
+SEC -> Send Financial KYC Credential Schema to Ledger
+========================================
+========================================
+General Auditor -> Get General KYC Schema from Ledger
+General Auditor -> Create and Store General KYC Credential Definition in Wallet
+General Auditor -> Send General KYC Credential Definition to Ledger
+Financial Auditor -> Get Financial KYC Schema from Ledger
+Financial Auditor -> Create and Store Financial KYC Credential Definition in Wallet
+Financial Auditor -> Send Financial KYC Credential Definition to Ledger
+========================================
+========================================
+General Auditor -> Establish p2p connection with JP Morgan
+General Auditor -> Create General KYC Credential Offer for JP Morgan
+General Auditor -> Encrypt General KYC Credential Offer with JP Morgan's key
+General Auditor -> Send Encrypted General KYC Credential Offer to JP Morgan
+========================================
+Financial Auditor -> Establish p2p connection with JP Morgan
+Financial Auditor -> Create Financial KYC Credential Offer for JP Morgan
+Financial Auditor -> Encrypt Financial KYC Credential Offer with JP Morgan's key
+Financial Auditor -> Send Encrypted Financial KYC Credential Offer to JP Morgan
+========================================
+========================================
+JP Morgan -> Create and Store Master Secret in Wallet
+JP Morgan -> Decrypt General KYC Credential Offer from General Auditor
+JP Morgan -> Get General KYC Credential Definition from Ledger
+JP Morgan -> Create General KYC Credential Request for General Auditor
+JP Morgan -> Encrypt General KYC Credential Request with General Auditor's key
+JP Morgan -> Send encrypted General KYC Credential Request to General Auditor
+JP Morgan -> Decrypt Financial KYC Credential Offer from Financial Auditor
+JP Morgan -> Get Financial KYC Credential Definition from Ledger
+JP Morgan -> Create Financial KYC Credential Request for Financial Auditor
+JP Morgan -> Encrypt Financial KYC Credential Request with Financial Auditor's key
+JP Morgan -> Send encrypted Financial KYC Credential Request to Financial Auditor
+========================================
+========================================
+General Auditor -> Decrypt General KYC Credential Request from JP Morgan
+General Auditor -> Create General KYC Credential for JP Morgan
+General Auditor -> Encrypt General KYC Credential for JP Morgan
+General Auditor -> Send encrypted General KYC Credential to JP Morgan
+========================================
+Financial Auditor -> Decrypt Financial KYC Credential Request from JP Morgan
+Financial Auditor -> Create Financial KYC Credential for JP Morgan
+Financial Auditor -> Encrypt Financial KYC Credential for JP Morgan
+Financial Auditor -> Send encrypted Financial KYC Credential to JP Morgan
+========================================
+========================================
+JP Morgan -> Decrypt General KYC Credential from General Auditor
+JP Morgan -> Get General KYC Credential Definition from Ledger
+JP Morgan -> Store General KYC Credential in Wallet
+JP Morgan -> Decrypt Financial KYC Credential from Financial Auditor
+JP Morgan -> Get Financial KYC Credential Definition from Ledger
+JP Morgan -> Store Financial KYC Credential in Wallet
+========================================
+========================================
+Goldman Sachs -> Establish p2p connection with JP Morgan
+Goldman Sachs -> Get JP Morgan's key
+Goldman Sachs -> Create General KYC Credential Proof Request
+Goldman Sachs -> Encrypt General KYC Credential Proof Request with JP Morgan's key
+Goldman Sachs -> Send encrypted General KYC Credential Proof Request to JP Morgan
+Goldman Sachs -> Create Financial KYC Credential Proof Request
+Goldman Sachs -> Encrypt Financial KYC Credential Proof Request with JP Morgan's key
+Goldman Sachs -> Send encrypted Financial KYC Credential Proof Request to JP Morgan
+========================================
+========================================
+JP Morgan -> Decrypt General KYC Credential Proof Request from Goldman Sachs
+JP Morgan -> Get credentials for General KYC Credential Proof Request
+JP Morgan -> Create General KYC Credential Proof
+JP Morgan -> Encrypt General KYC Credential Proof for Goldman Sachs
+JP Morgan -> Send encrypted General KYC Credential Proof to Goldman Sachs
+JP Morgan -> Decrypt Financial KYC Credential Proof Request from Goldman Sachs
+JP Morgan -> Get credentials for Financial KYC Credential Proof Request
+JP Morgan -> Create Financial KYC Credential Proof
+JP Morgan -> Encrypt Financial KYC Credential Proof for Goldman Sachs
+JP Morgan -> Send encrypted Financial KYC Credential Proof to Goldman Sachs
+========================================
+========================================
+Goldman Sachs -> Decrypt General KYC Credential Proof from JP Morgan
+Goldman Sachs -> Verify General KYC Credential Proof from JP Morgan
+Goldman Sachs -> Decrypt Financial KYC Credential Proof from JP Morgan
+Goldman Sachs -> Verify Financial KYC Credential Proof from JP Morgan
+========================================
+========================================
+Close and Delete Government's Wallet
+Close and Delete SEC's Wallet
+Close and Delete General Auditor's Wallet
+Close and Delete Financial Auditor's Wallet
+Close and Delete Goldman Sachs's Wallet
+Close and Delete JP Morgan's Wallet
+Close and Delete Pool
+=============== End Demo ===============
+========================================
