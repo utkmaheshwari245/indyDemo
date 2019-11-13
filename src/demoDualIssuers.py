@@ -4,6 +4,8 @@ import json
 
 from indy import anoncreds, crypto, did, ledger, pool, wallet
 
+tab = "    "
+
 async def run():
 
     print("========================================")
@@ -16,11 +18,15 @@ async def run():
         'name': 'pool1',
         'config': json.dumps({"genesis_txn": '/home/indy/sandbox/pool_transactions_genesis'})
     }
+
+    print(tab + 'System -> Create pool with ledger config')
     try:
         await pool.create_pool_ledger_config(pool_['name'], pool_['config'])
     except IndyError as ex:
         if ex.error_code == ErrorCode.PoolLedgerConfigAlreadyExistsError:
             pass
+
+    print(tab + 'System -> Open pool')
     pool_['handle'] = await pool.open_pool_ledger(pool_['name'], None)
 
     print("Initialize Government")
@@ -31,16 +37,20 @@ async def run():
         'pool': pool_['handle'],
         'seed': '000000000000000000000000Steward1'
     }
+
+    print(tab + 'Government -> Create wallet')
     try:
         await wallet.create_wallet(government['wallet_config'], government['wallet_credentials'])
     except IndyError as ex:
         if ex.error_code == ErrorCode.WalletAlreadyExistsError:
             pass
     government['wallet'] = await wallet.open_wallet(government['wallet_config'], government['wallet_credentials'])
+
+    print(tab + 'Government -> Create did and key and store in wallet')
     government['did_info'] = json.dumps({'seed': government['seed']})
     (government['did'], government['key']) = await did.create_and_store_my_did(government['wallet'], government['did_info'])
 
-    print('Government -> Initialize SEC')
+    print('Initialize SEC')
     sec = {
         'name': 'sec',
         'wallet_config': json.dumps({'id': 'sec_wallet'}),
@@ -56,7 +66,7 @@ async def run():
 
     sec['did'] = await get_verinym(government, sec)
 
-    print('Government -> Initialize General Auditor')
+    print('Initialize General Auditor')
     general_auditor = {
         'name': 'general_auditor',
         'wallet_config': json.dumps({'id': 'general_auditor_wallet'}),
@@ -72,7 +82,7 @@ async def run():
 
     general_auditor['did'] = await get_verinym(government, general_auditor)
 
-    print('Government -> Initialize Financial Auditor')
+    print('Initialize Financial Auditor')
     financial_auditor = {
         'name': 'financial_auditor',
         'wallet_config': json.dumps({'id': 'financial_auditor_wallet'}),
@@ -88,7 +98,7 @@ async def run():
 
     financial_auditor['did'] = await get_verinym(government, financial_auditor)
 
-    print('Government -> Initialize Goldman Sachs')
+    print('Initialize Goldman Sachs')
     goldman_sachs = {
         'name': 'goldman_sachs',
         'wallet_config': json.dumps({'id': 'goldman_sachs_wallet'}),
@@ -691,13 +701,22 @@ async def run():
 
 async def onboarding(_from, _to):
 
+    print(tab + _from['name'] + ' -> Create pairwise did and key for ' + _to['name'] + ' and store in wallet')
     (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], "{}")
 
+    print(tab + _from['name'] + ' -> Send the pairwise did and key to ledger')
     await send_nym(_from['pool'], _from['wallet'], _from['did'], from_to_did, from_to_key, None)
 
-    _from['connection_request'] = {'did': from_to_did, 'nonce': 123456789}
+    print(tab + _from['name'] + ' -> Create connection request for ' + _to['name'] + ' with the pairwise did and a nonce')
+    _from['connection_request'] = {'did': from_to_did,
+                                   'nonce': 123456789}
+
+    print(tab + _from['name'] + ' -> Send connection request to ' + _to['name'])
     _to['connection_request'] = _from['connection_request']
 
+    print(tab + "====================================")
+
+    print(tab + _to['name'] + ' -> Create wallet')
     if 'wallet' not in _to:
         try:
             await wallet.create_wallet(_to['wallet_config'], _to['wallet_credentials'])
@@ -706,24 +725,39 @@ async def onboarding(_from, _to):
                 pass
         _to['wallet'] = await wallet.open_wallet(_to['wallet_config'], _to['wallet_credentials'])
 
+    print(tab + _to['name'] + ' -> Create pairwise did and key for ' + _from['name'] + ' and store in wallet')
     (to_from_did, to_from_key) = await did.create_and_store_my_did(_to['wallet'], "{}")
 
+    print(tab + _to['name'] + ' -> Create connection response for ' + _from['name'] + ' with the pairwise did and key and the nonce')
     _to['connection_response'] = json.dumps({
         'did': to_from_did,
         'verkey': to_from_key,
         'nonce': _to['connection_request']['nonce']
     })
 
+    print(tab + _to['name'] + ' -> Get ' + _from['name']  + '\'s pairwise key from ledger')
     from_to_verkey = await did.key_for_did(_from['pool'], _to['wallet'], _to['connection_request']['did'])
 
+    print(tab + _to['name'] + ' -> Encrypt connection response with '  + _from['name']  + '\'s pairwise key')
     _to['anoncrypted_connection_response'] = await crypto.anon_crypt(from_to_verkey, _to['connection_response'].encode('utf-8'))
+
+    print(tab + _to['name'] + ' -> Send connection response to ' + _from['name'])
     _from['anoncrypted_connection_response'] = _to['anoncrypted_connection_response']
+
+    print(tab + "====================================")
+
+    print(tab + _from['name'] + ' -> Decrypt connection response from ' + _to['name'])
     _from['connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'],
                                                                          from_to_key,
                                                                          _from['anoncrypted_connection_response'])).decode("utf-8"))
 
+    print(tab + _from['name'] + ' -> Compare nonce in response with original nonce for validation')
     assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
+
+    print(tab + _from['name'] + ' -> Send ' + _to['name'] + '\'s pairwise did and key to ledger')
     await send_nym(_from['pool'], _from['wallet'], _from['did'], to_from_did, to_from_key, None)
+
+    print(tab + "====================================")
 
     return (from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response'])
 
@@ -735,18 +769,32 @@ async def get_verinym(_from, _to):
     to_from_did = _to['did_for_government']
     to_from_key = _to['key_for_government']
 
+    print(tab + _to['name'] + ' -> Create did and key and store in wallet')
     (to_did, to_key) = await did.create_and_store_my_did(_to['wallet'], "{}")
 
-    _to['did_info'] = json.dumps({'did': to_did, 'verkey': to_key})
+    print(tab + _to['name'] + ' -> Create message info with the did and key')
+    _to['did_info'] = json.dumps({'did': to_did,
+                                  'verkey': to_key})
+
+    print(tab + _to['name'] + ' -> Encrypt the message and it\'s own pairwise key with ' + _from['name'] + '\'s pairwise key ')
     _to['authcrypted_did_info'] = await crypto.auth_crypt(_to['wallet'], to_from_key, from_to_key, _to['did_info'].encode('utf-8'))
+
+    print(tab + _to['name'] + ' -> Send encrypted message to ' + _from['name'])
     _from['authcrypted_did_info'] = _to['authcrypted_did_info']
 
+    print(tab + "====================================")
+
+    print(tab + _from['name'] + ' -> Decrypt message from ' + _to['name'])
     (sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info) = await auth_decrypt(_from['wallet'],
                                                                                               from_to_key,
                                                                                               _from['authcrypted_did_info'])
-
+    print(tab + _from['name'] + ' -> Get ' + _to['name'] + '\'s pairwise key from ledger and compare with sender\'s pairwise key in decrypted message to validate')
     assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], to_from_did)
+
+    print(tab + _from['name'] + ' -> Send ' + _to['name'] + '\'s did and key to ledger')
     await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['verkey'], _to['role'])
+
+    print(tab + "====================================")
 
     return to_did
 
