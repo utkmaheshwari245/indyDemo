@@ -114,6 +114,7 @@ async def run():
 
     goldman_sachs['did'] = await get_verinym(government, goldman_sachs)
 
+    print()
     print("========================================")
     print("============== Start Demo ==============")
     print("========================================")
@@ -701,6 +702,8 @@ async def run():
 
 async def onboarding(_from, _to):
 
+    print(tab + "====================================")
+
     print(tab + _from['name'] + ' -> Create pairwise did and key for ' + _to['name'] + ' and store in wallet')
     (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], "{}")
 
@@ -751,7 +754,7 @@ async def onboarding(_from, _to):
                                                                          from_to_key,
                                                                          _from['anoncrypted_connection_response'])).decode("utf-8"))
 
-    print(tab + _from['name'] + ' -> Compare nonce in response with original nonce for validation')
+    print(tab + _from['name'] + ' -> Get nonce from response and validate with original nonce')
     assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
 
     print(tab + _from['name'] + ' -> Send ' + _to['name'] + '\'s pairwise did and key to ledger')
@@ -788,7 +791,7 @@ async def get_verinym(_from, _to):
     (sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info) = await auth_decrypt(_from['wallet'],
                                                                                               from_to_key,
                                                                                               _from['authcrypted_did_info'])
-    print(tab + _from['name'] + ' -> Get ' + _to['name'] + '\'s pairwise key from ledger and compare with sender\'s pairwise key in decrypted message to validate')
+    print(tab + _from['name'] + ' -> Get ' + _to['name'] + '\'s pairwise key from ledger and validate with sender\'s pairwise key in decrypted message')
     assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], to_from_did)
 
     print(tab + _from['name'] + ' -> Send ' + _to['name'] + '\'s did and key to ledger')

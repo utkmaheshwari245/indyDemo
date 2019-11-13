@@ -8,6 +8,7 @@ Initialize Government
     Government -> Create wallet
     Government -> Create did and key and store in wallet
 Initialize SEC
+    ====================================
     government -> Create pairwise did and key for sec and store in wallet
     government -> Send the pairwise did and key to ledger
     government -> Create connection request for sec with the pairwise did and a nonce
@@ -21,7 +22,7 @@ Initialize SEC
     sec -> Send connection response to government
     ====================================
     government -> Decrypt connection response from sec
-    government -> Compare nonce in response with original nonce for validation
+    government -> Get nonce from response and validate with original nonce
     government -> Send sec's pairwise did and key to ledger
     ====================================
     sec -> Create did and key and store in wallet
@@ -32,7 +33,9 @@ Initialize SEC
     government -> Decrypt message from sec
     government -> Get sec's pairwise key from ledger and validate with sender's pairwise key in decrypted message
     government -> Send sec's did and key to ledger
+    ====================================
 Initialize General Auditor
+    ====================================
     government -> Create pairwise did and key for general_auditor and store in wallet
     government -> Send the pairwise did and key to ledger
     government -> Create connection request for general_auditor with the pairwise did and a nonce
@@ -46,7 +49,7 @@ Initialize General Auditor
     general_auditor -> Send connection response to government
     ====================================
     government -> Decrypt connection response from general_auditor
-    government -> Compare nonce in response with original nonce for validation
+    government -> Get nonce from response and validate with original nonce
     government -> Send general_auditor's pairwise did and key to ledger
     ====================================
     general_auditor -> Create did and key and store in wallet
@@ -57,7 +60,9 @@ Initialize General Auditor
     government -> Decrypt message from general_auditor
     government -> Get general_auditor's pairwise key from ledger and validate with sender's pairwise key in decrypted message
     government -> Send general_auditor's did and key to ledger
+    ====================================
 Initialize Financial Auditor
+    ====================================
     government -> Create pairwise did and key for financial_auditor and store in wallet
     government -> Send the pairwise did and key to ledger
     government -> Create connection request for financial_auditor with the pairwise did and a nonce
@@ -71,7 +76,7 @@ Initialize Financial Auditor
     financial_auditor -> Send connection response to government
     ====================================
     government -> Decrypt connection response from financial_auditor
-    government -> Compare nonce in response with original nonce for validation
+    government -> Get nonce from response and validate with original nonce
     government -> Send financial_auditor's pairwise did and key to ledger
     ====================================
     financial_auditor -> Create did and key and store in wallet
@@ -82,7 +87,9 @@ Initialize Financial Auditor
     government -> Decrypt message from financial_auditor
     government -> Get financial_auditor's pairwise key from ledger and validate with sender's pairwise key in decrypted message
     government -> Send financial_auditor's did and key to ledger
+    ====================================
 Initialize Goldman Sachs
+    ====================================
     government -> Create pairwise did and key for goldman_sachs and store in wallet
     government -> Send the pairwise did and key to ledger
     government -> Create connection request for goldman_sachs with the pairwise did and a nonce
@@ -96,7 +103,7 @@ Initialize Goldman Sachs
     goldman_sachs -> Send connection response to government
     ====================================
     government -> Decrypt connection response from goldman_sachs
-    government -> Compare nonce in response with original nonce for validation
+    government -> Get nonce from response and validate with original nonce
     government -> Send goldman_sachs's pairwise did and key to ledger
     ====================================
     goldman_sachs -> Create did and key and store in wallet
@@ -107,6 +114,8 @@ Initialize Goldman Sachs
     government -> Decrypt message from goldman_sachs
     government -> Get goldman_sachs's pairwise key from ledger and validate with sender's pairwise key in decrypted message
     government -> Send goldman_sachs's did and key to ledger
+    ====================================
+
 ========================================
 ============== Start Demo ==============
 ========================================
@@ -124,6 +133,7 @@ Financial Auditor -> Create and Store Financial KYC Credential Definition in Wal
 Financial Auditor -> Send Financial KYC Credential Definition to Ledger
 ========================================
 General Auditor -> Establish p2p connection with JP Morgan
+    ====================================
     general_auditor -> Create pairwise did and key for jp_morgan and store in wallet
     general_auditor -> Send the pairwise did and key to ledger
     general_auditor -> Create connection request for jp_morgan with the pairwise did and a nonce
@@ -137,13 +147,15 @@ General Auditor -> Establish p2p connection with JP Morgan
     jp_morgan -> Send connection response to general_auditor
     ====================================
     general_auditor -> Decrypt connection response from jp_morgan
-    general_auditor -> Compare nonce in response with original nonce for validation
+    general_auditor -> Get nonce from response and validate with original nonce
     general_auditor -> Send jp_morgan's pairwise did and key to ledger
+    ====================================
 General Auditor -> Create General KYC Credential Offer for JP Morgan
 General Auditor -> Encrypt General KYC Credential Offer with JP Morgan's key
 General Auditor -> Send Encrypted General KYC Credential Offer to JP Morgan
 ========================================
 Financial Auditor -> Establish p2p connection with JP Morgan
+    ====================================
     financial_auditor -> Create pairwise did and key for jp_morgan and store in wallet
     financial_auditor -> Send the pairwise did and key to ledger
     financial_auditor -> Create connection request for jp_morgan with the pairwise did and a nonce
@@ -157,8 +169,9 @@ Financial Auditor -> Establish p2p connection with JP Morgan
     jp_morgan -> Send connection response to financial_auditor
     ====================================
     financial_auditor -> Decrypt connection response from jp_morgan
-    financial_auditor -> Compare nonce in response with original nonce for validation
+    financial_auditor -> Get nonce from response and validate with original nonce
     financial_auditor -> Send jp_morgan's pairwise did and key to ledger
+    ====================================
 Financial Auditor -> Create Financial KYC Credential Offer for JP Morgan
 Financial Auditor -> Encrypt Financial KYC Credential Offer with JP Morgan's key
 Financial Auditor -> Send Encrypted Financial KYC Credential Offer to JP Morgan
@@ -193,6 +206,7 @@ JP Morgan -> Get Financial KYC Credential Definition from Ledger
 JP Morgan -> Store Financial KYC Credential in Wallet
 ========================================
 Goldman Sachs -> Establish p2p connection with JP Morgan
+    ====================================
     goldman_sachs -> Create pairwise did and key for jp_morgan and store in wallet
     goldman_sachs -> Send the pairwise did and key to ledger
     goldman_sachs -> Create connection request for jp_morgan with the pairwise did and a nonce
@@ -206,8 +220,9 @@ Goldman Sachs -> Establish p2p connection with JP Morgan
     jp_morgan -> Send connection response to goldman_sachs
     ====================================
     goldman_sachs -> Decrypt connection response from jp_morgan
-    goldman_sachs -> Compare nonce in response with original nonce for validation
+    goldman_sachs -> Get nonce from response and validate with original nonce
     goldman_sachs -> Send jp_morgan's pairwise did and key to ledger
+    ====================================
 Goldman Sachs -> Get JP Morgan's key
 Goldman Sachs -> Create General KYC Credential Proof Request
 Goldman Sachs -> Encrypt General KYC Credential Proof Request with JP Morgan's key
