@@ -1,157 +1,64 @@
+========================================
+================ Set Up ================
+========================================
+Initialize Pool (Blockchain Ledger)
+Initialize Government (Blockchain Steward)
+Initialize SEC (KYC Schema Creater)
+Initialize Goldman Sachs (KYC Credential Issuer)
+Initialize JP Morgan (KYC Credential Verifier)
+Initialize Two Sigma (KYC Credential Holder)
+========================================
 ============== Start Demo ==============
-Setup Pool
-    Create pool
-    Get pool handle
-Setup Government
-    Create wallet
-    Create and store did and key in wallet
-==============================
-==============================
-Onboard SEC
-===== Generate Pseudonym =====
-    government -> Create pairwise did and key for sec and store in wallet
-    government -> Send the pairwise did and key to ledger
-    government -> Create connection request for sec with the pairwise did and a nonce
-    government -> Send connection request to sec
-    sec -> Create wallet
-    sec -> Create pairwise did and key for government and store in wallet
-    sec -> Create connection response for government with the pairwise did and key and the nonce
-    sec -> Get pairwise key of government from ledger
-    sec -> Encrypt connection response with the pairwise key
-    sec -> Send connection response to government
-    government -> Decrypt connection response from sec
-    government -> Compare nonce in response with original nonce for validation
-    government -> Send pairwise did and key of sec to ledger
-====== Generate Verinym ======
-    sec -> Create did and key and store in wallet
-    sec -> Create did info with the did and key
-    sec -> Encrypt the did info with pairwise key of government
-    sec -> Send encrypted did info to government
-    government -> Decrypt did info from sec
-    government -> Compare pairwise key of sec to validate
-    government -> Send did and key of sec to ledger
-Onboard Auditor
-===== Generate Pseudonym =====
-    government -> Create pairwise did and key for auditor and store in wallet
-    government -> Send the pairwise did and key to ledger
-    government -> Create connection request for auditor with the pairwise did and a nonce
-    government -> Send connection request to auditor
-    auditor -> Create wallet
-    auditor -> Create pairwise did and key for government and store in wallet
-    auditor -> Create connection response for government with the pairwise did and key and the nonce
-    auditor -> Get pairwise key of government from ledger
-    auditor -> Encrypt connection response with the pairwise key
-    auditor -> Send connection response to government
-    government -> Decrypt connection response from auditor
-    government -> Compare nonce in response with original nonce for validation
-    government -> Send pairwise did and key of auditor to ledger
-====== Generate Verinym ======
-    auditor -> Create did and key and store in wallet
-    auditor -> Create did info with the did and key
-    auditor -> Encrypt the did info with pairwise key of government
-    auditor -> Send encrypted did info to government
-    government -> Decrypt did info from auditor
-    government -> Compare pairwise key of auditor to validate
-    government -> Send did and key of auditor to ledger
-Onboard Goldman Sachs
-===== Generate Pseudonym =====
-    government -> Create pairwise did and key for goldman_sachs and store in wallet
-    government -> Send the pairwise did and key to ledger
-    government -> Create connection request for goldman_sachs with the pairwise did and a nonce
-    government -> Send connection request to goldman_sachs
-    goldman_sachs -> Create wallet
-    goldman_sachs -> Create pairwise did and key for government and store in wallet
-    goldman_sachs -> Create connection response for government with the pairwise did and key and the nonce
-    goldman_sachs -> Get pairwise key of government from ledger
-    goldman_sachs -> Encrypt connection response with the pairwise key
-    goldman_sachs -> Send connection response to government
-    government -> Decrypt connection response from goldman_sachs
-    government -> Compare nonce in response with original nonce for validation
-    government -> Send pairwise did and key of goldman_sachs to ledger
-====== Generate Verinym ======
-    goldman_sachs -> Create did and key and store in wallet
-    goldman_sachs -> Create did info with the did and key
-    goldman_sachs -> Encrypt the did info with pairwise key of government
-    goldman_sachs -> Send encrypted did info to government
-    government -> Decrypt did info from goldman_sachs
-    government -> Compare pairwise key of goldman_sachs to validate
-    government -> Send did and key of goldman_sachs to ledger
-==============================
+========================================
 SEC -> Create KYC Credential Schema
 SEC -> Send KYC Credential Schema to Ledger
-==============================
-Auditor -> Get KYC Schema from Ledger
-Auditor -> Create and Store KYC Credential Definition in Wallet
-Auditor -> Send KYC Credential Definition to Ledger
-==============================
-Onboard JP Morgan
-===== Generate Pseudonym =====
-    auditor -> Create pairwise did and key for jp_morgan and store in wallet
-    auditor -> Send the pairwise did and key to ledger
-    auditor -> Create connection request for jp_morgan with the pairwise did and a nonce
-    auditor -> Send connection request to jp_morgan
-    jp_morgan -> Create wallet
-    jp_morgan -> Create pairwise did and key for auditor and store in wallet
-    jp_morgan -> Create connection response for auditor with the pairwise did and key and the nonce
-    jp_morgan -> Get pairwise key of auditor from ledger
-    jp_morgan -> Encrypt connection response with the pairwise key
-    jp_morgan -> Send connection response to auditor
-    auditor -> Decrypt connection response from jp_morgan
-    auditor -> Compare nonce in response with original nonce for validation
-    auditor -> Send pairwise did and key of jp_morgan to ledger
-Auditor -> Create KYC Credential Offer for JP Morgan
-Auditor -> Encrypt KYC Credential Offer with JP Morgan's key
-Auditor -> Send Encrypted KYC Credential Offer to JP Morgan
-==============================
-JP Morgan -> Decrypt KYC Credential Offer from Auditor
-JP Morgan -> Create and Store Master Secret in Wallet
-JP Morgan -> Get KYC Credential Definition from Ledger
-JP Morgan -> Create KYC Credential Request for Auditor
-JP Morgan -> Encrypt KYC Credential Request with Auditor's key
-JP Morgan -> Send encrypted KYC Credential Request to Auditor
-==============================
-Auditor -> Decrypt KYC Credential Request from JP Morgan
-Auditor -> Create KYC Credential for JP Morgan
-Auditor -> Encrypt KYC Credential for JP Morgan
-Auditor -> Send encrypted KYC Credential to JP Morgan
-==============================
-JP Morgan -> Decrypt KYC Credential from auditor
-JP Morgan -> Get KYC Credential Definition from Ledger
-JP Morgan -> Store KYC Credential in Wallet
-==============================
-Goldman Sachs -> Establish p2p connection with JP Morgan
-===== Generate Pseudonym =====
-    goldman_sachs -> Create pairwise did and key for jp_morgan and store in wallet
-    goldman_sachs -> Send the pairwise did and key to ledger
-    goldman_sachs -> Create connection request for jp_morgan with the pairwise did and a nonce
-    goldman_sachs -> Send connection request to jp_morgan
-    jp_morgan -> Create wallet
-    jp_morgan -> Create pairwise did and key for goldman_sachs and store in wallet
-    jp_morgan -> Create connection response for goldman_sachs with the pairwise did and key and the nonce
-    jp_morgan -> Get pairwise key of goldman_sachs from ledger
-    jp_morgan -> Encrypt connection response with the pairwise key
-    jp_morgan -> Send connection response to goldman_sachs
-    goldman_sachs -> Decrypt connection response from jp_morgan
-    goldman_sachs -> Compare nonce in response with original nonce for validation
-    goldman_sachs -> Send pairwise did and key of jp_morgan to ledger
-Goldman Sachs -> Create KYC Credential Proof Request
-Goldman Sachs -> Encrypt KYC Credential Proof Request with JP Morgan's key
-Goldman Sachs -> Send encrypted KYC Credential Proof Request to JP Morgan
-==============================
-JP Morgan -> Decrypt KYC Credential Proof Request from Goldman Sachs
-JP Morgan -> Get credentials for KYC Credential Proof Request
-JP Morgan -> Create KYC Credential Proof
-JP Morgan -> Encrypt KYC Credential Proof for Goldman Sachs
-JP Morgan -> Send encrypted KYC Credential Proof to Goldman Sachs
-==============================
-Goldman Sachs -> Decrypt KYC Credential Proof from JP Morgan
-Goldman Sachs -> Verify KYC Credential Proof from JP Morgan
-==============================
-==============================
+========================================
+Goldman Sachs -> Get KYC Schema from Ledger
+Goldman Sachs -> Create and Store KYC Credential Definition in Wallet
+Goldman Sachs -> Send KYC Credential Definition to Ledger
+Goldman Sachs -> Establish p2p connection with Two Sigma
+Goldman Sachs -> Create KYC Credential Offer for Two Sigma
+Goldman Sachs -> Get Two Sigma's key
+Goldman Sachs -> Encrypt KYC Credential Offer
+Goldman Sachs -> Send Encrypted KYC Credential Offer to Two Sigma
+========================================
+Two Sigma -> Create and Store Master Secret in Wallet
+Two Sigma -> Decrypt KYC Credential Offer from Goldman Sachs
+Two Sigma -> Get KYC Credential Definition from Ledger
+Two Sigma -> Create KYC Credential Request for Goldman Sachs
+Two Sigma -> Encrypt KYC Credential Request
+Two Sigma -> Send encrypted KYC Credential Request to Goldman Sachs
+========================================
+Goldman Sachs -> Decrypt KYC Credential Request from Two Sigma
+Goldman Sachs -> Create KYC Credential for Two Sigma
+Goldman Sachs -> Encrypt KYC Credential
+Goldman Sachs -> Send encrypted KYC Credential to Two Sigma
+========================================
+Two Sigma -> Decrypt KYC Credential from Goldman Sachs
+Two Sigma -> Get KYC Credential Definition from Ledger
+Two Sigma -> Store KYC Credential in Wallet
+========================================
+JP Morgan -> Establish p2p connection with Two Sigma
+JP Morgan -> Create KYC Credential Proof Request
+JP Morgan -> Get Two Sigma's key
+JP Morgan -> Encrypt KYC Credential Proof Request
+JP Morgan -> Send encrypted KYC Credential Proof Request to Two Sigma
+========================================
+Two Sigma -> Decrypt KYC Credential Proof Request from JP Morgan
+Two Sigma -> Get credentials for KYC Credential Proof Request
+Two Sigma -> Create KYC Credential Proof
+Two Sigma -> Encrypt KYC Credential Proof
+Two Sigma -> Send encrypted KYC Credential Proof to JP Morgan
+========================================
+JP Morgan -> Decrypt KYC Credential Proof from Two Sigma
+JP Morgan -> Verify KYC Credential Proof from Two Sigma
+========================================
+=============== End Demo ===============
+========================================
 Close and Delete Government's Wallet
 Close and Delete SEC's Wallet
-Close and Delete Auditor's Wallet
 Close and Delete Goldman Sachs's Wallet
 Close and Delete JP Morgan's Wallet
+Close and Delete Two Sigma's Wallet
 Close and Delete Pool
-============== Finish Demo ==============
+========================================
