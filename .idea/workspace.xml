@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e5620b44-0662-4777-8c6b-af869e827eff" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/demoDualIssuersX.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/demoDualIssuersX.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/demoSingleIssuer.py" beforeDir="false" />
-    </list>
+    <list default="true" id="e5620b44-0662-4777-8c6b-af869e827eff" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
