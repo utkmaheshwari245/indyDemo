@@ -6,6 +6,7 @@ import json
 from indy import anoncreds, crypto, did, ledger, pool, wallet, blob_storage
 from os.path import dirname
 
+
 async def run():
     print("========================================")
     print("============== Start Demo ==============")
