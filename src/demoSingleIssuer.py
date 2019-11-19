@@ -342,9 +342,9 @@ async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__en
     print("Two Sigma -> Create KYC Credential Proof")
     revoc_states_for_cred = json.loads(sig['cred_revoc_states'])
     timestamp_for_attr1 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_cred)
-    timestamp_for_attr2 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_cred)
-    timestamp_for_attr3 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_cred)
-    timestamp_for_attr4 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_cred)
+    timestamp_for_attr2 = get_timestamp_for_attribute(cred_for_attr2, revoc_states_for_cred)
+    timestamp_for_attr3 = get_timestamp_for_attribute(cred_for_attr3, revoc_states_for_cred)
+    timestamp_for_attr4 = get_timestamp_for_attribute(cred_for_attr4, revoc_states_for_cred)
     timestamp_for_predicate1 = get_timestamp_for_attribute(cred_for_predicate1, revoc_states_for_cred)
     sig['cred_requested_creds'] = json.dumps({
         'self_attested_attributes': {},
