@@ -207,10 +207,10 @@ async def sig___decrypt_cred_offer_from_gs__create_cred_request_for_gs__encrypt_
     sig['cred_def_id'] = authdecrypted_cred_offer['cred_def_id']
 
     print("Two Sigma -> Get KYC Credential Definition from Ledger")
-    (sig['gs_cred_def_id'], sig['gs_cred_def']) = await get_cred_def(sig['pool'], sig['did_for_gs'], authdecrypted_cred_offer['cred_def_id'])
+    (sig['gs_cred_def_id'], sig['gs_cred_def']) = await get_cred_def(sig['pool'], sig['did'], authdecrypted_cred_offer['cred_def_id'])
 
     print("Two Sigma -> Create KYC Credential Request for Goldman Sachs")
-    (sig['cred_request'], sig['cred_request_metadata']) = await anoncreds.prover_create_credential_req(sig['wallet'], sig['did_for_gs'], sig['cred_offer'],
+    (sig['cred_request'], sig['cred_request_metadata']) = await anoncreds.prover_create_credential_req(sig['wallet'], sig['did'], sig['cred_offer'],
                                                                                                        sig['gs_cred_def'], sig['master_secret_id'])
 
     print("Two Sigma -> Encrypt KYC Credential Request")
@@ -256,12 +256,10 @@ async def sig___decrypt_cred_from_gs__get_revocation_registry_definition_from_le
     (_, sig['cred'], cred) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['authcrypted_cred'])
 
     print("Two Sigma -> Get KYC Credential Definition from Ledger")
-    (_, sig['cred_def']) = await get_cred_def(sig['pool'], sig['did_for_gs'], sig['cred_def_id'])
+    (_, sig['cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['cred_def_id'])
 
     print("Two Sigma -> Get Revocation Registry Definition from Ledger")
-    sig['revoc_reg_des_req'] = await ledger.build_get_revoc_reg_def_request(sig['did_for_gs'], cred['rev_reg_id'])
-    sig['revoc_reg_des_resp'] = await ledger.submit_request(sig['pool'], sig['revoc_reg_des_req'])
-    (sig['revoc_reg_def_id'], sig['revoc_reg_def_json']) = await ledger.parse_get_revoc_reg_def_response(sig['revoc_reg_des_resp'])
+    (_, sig['revoc_reg_def_json']) = await get_revoc_reg(sig['pool'], sig['did'], cred['rev_reg_id'])
 
     print("Two Sigma -> Store KYC Credential in Wallet")
     await anoncreds.prover_store_credential(sig['wallet'], None, sig['cred_request_metadata'], sig['cred'], sig['cred_def'], sig['revoc_reg_def_json'])
@@ -338,7 +336,7 @@ async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__en
                                    cred_for_attr4['referent']: cred_for_attr4,
                                    cred_for_predicate1['referent']: cred_for_predicate1}
     requested_timestamp = int(json.loads(sig['cred_proof_request'])['non_revoked']['to'])
-    (sig['cred_schemas'], sig['cred_defs'], sig['cred_revoc_states']) = await prover_get_entities_from_ledger(sig['pool'], sig['did_for_jp'], sig['creds_for_cred_proof'],
+    (sig['cred_schemas'], sig['cred_defs'], sig['cred_revoc_states']) = await prover_get_entities_from_ledger(sig['pool'], sig['did'], sig['creds_for_cred_proof'],
                                                                                                               None, requested_timestamp)
 
     print("Two Sigma -> Create KYC Credential Proof")
@@ -556,6 +554,12 @@ async def get_cred_def(pool_handle, _did, cred_def_id):
     get_cred_def_request = await ledger.build_get_cred_def_request(_did, cred_def_id)
     get_cred_def_response = await ledger.submit_request(pool_handle, get_cred_def_request)
     return await ledger.parse_get_cred_def_response(get_cred_def_response)
+
+
+async def get_revoc_reg(pool_handle, _did, revoc_reg_id):
+    get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, revoc_reg_id)
+    get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
+    return await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
 
 
 async def get_credential_for_referent(search_handle, referent):
