@@ -3,8 +3,8 @@ import time
 import json
 
 
-from indy import anoncreds, crypto, did, ledger, pool, wallet
-
+from indy import anoncreds, crypto, did, ledger, pool, wallet, blob_storage
+from os.path import dirname
 
 async def run():
     print("========================================")
@@ -15,7 +15,6 @@ async def run():
     print("============== Start Demo ==============")
     print("========================================")
     await create_cred_schema__send_cred_schema_to_ledger__send_cred_schema_id_to_gs(sec, gs)
-    time.sleep(1)
     print("========================================")
     await get_cred_schema_from_ledger__create_cred_definition__send_cred_definition_to_ledger__send_cred_definition_id_to_jp(gs, jp)
     print("----------------------------------------")
@@ -31,7 +30,15 @@ async def run():
     print("========================================")
     await decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
     print("========================================")
-    await decrypt_cred_proof_from_sig__verify_cred_proof(jp)
+    await decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
+    print("========================================")
+    await revoke_cred_for_sig(gs)
+    print("========================================")
+    await establish_connection_with_sig__create_cred_proof_request_for_sig__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
+    print("========================================")
+    await decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
+    print("========================================")
+    await decrypt_cred_proof_from_sig__verify_cred_proof(jp, False)
     print("========================================")
     print("=============== End Demo ===============")
     print("========================================")
@@ -133,7 +140,7 @@ async def get_cred_schema_from_ledger__create_cred_definition__send_cred_definit
     kyc_cred_def = {
         'tag': 'TAG1',
         'type': 'CL',
-        'config': {"support_revocation": False}
+        'config': {"support_revocation": True}
     }
     (gs['kyc_cred_def_id'], gs['kyc_cred_def']) = await anoncreds.issuer_create_and_store_credential_def(gs['wallet'], gs['did'], gs['kyc_schema'], kyc_cred_def['tag'],
                                                                                                          kyc_cred_def['type'], json.dumps(kyc_cred_def['config']))
@@ -143,6 +150,23 @@ async def get_cred_schema_from_ledger__create_cred_definition__send_cred_definit
 
     print("Goldman Sachs -> Send KYC Credential Definition Id to JP Morgan")
     jp['kyc_cred_def_id'] = gs['kyc_cred_def_id']
+
+    print("Goldman Sachs -> Create Revocation Registry")
+    gs['tails_writer_config'] = json.dumps({'base_dir': "/tmp/indy_acme_tails", 'uri_pattern': ''})
+    tails_writer = await blob_storage.open_writer('default', gs['tails_writer_config'])
+    (gs['revoc_reg_id'], gs['revoc_reg_def'], gs['revoc_reg_entry']) = await anoncreds.issuer_create_and_store_revoc_reg(gs['wallet'], gs['did'], 'CL_ACCUM', 'TAG1',
+                                                                                                                         gs['kyc_cred_def_id'],
+                                                                                                                         json.dumps({'max_cred_num': 5,
+                                                                                                                                     'issuance_type': 'ISSUANCE_ON_DEMAND'}),
+                                                                                                                         tails_writer)
+
+    print("Goldman Sachs -> Post Revocation Registry Definition to Ledger")
+    gs['revoc_reg_def_request'] = await ledger.build_revoc_reg_def_request(gs['did'], gs['revoc_reg_def'])
+    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['revoc_reg_def_request'])
+
+    print("Goldman Sachs -> Post Revocation Registry Entry to Ledger")
+    gs['revoc_reg_entry_request'] = await ledger.build_revoc_reg_entry_request(gs['did'], gs['revoc_reg_id'], 'CL_ACCUM', gs['revoc_reg_entry'])
+    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['revoc_reg_entry_request'])
 
 
 async def establish_connection_with_sig__create_cred_offer_for_sig__encrypt_cred_offer__send_cred_offer_to_sig(gs, sig):
@@ -197,7 +221,14 @@ async def decrypt_cred_request_from_sig__create_cred_for_sig__encrypt_cred__send
         "liquidity": {"raw": "2.8", "encoded": "2.8"},
         "rating": {"raw": "4", "encoded": "4"}
     })
-    (gs['kyc_cred'], _, _) = await anoncreds.issuer_create_credential(gs['wallet'], gs['kyc_cred_offer'], gs['kyc_cred_request'], gs['sig_kyc_cred_values'], None, None)
+    gs['blob_storage_reader_cfg_handle'] = await blob_storage.open_reader('default', gs['tails_writer_config'])
+    (gs['kyc_cred'], gs['kyc_cred_rev_id'], gs['kyc_cred_rev_reg_delta']) = await anoncreds.issuer_create_credential(gs['wallet'], gs['kyc_cred_offer'], gs['kyc_cred_request'],
+                                                                                                                     gs['sig_kyc_cred_values'], gs['revoc_reg_id'],
+                                                                                                                     gs['blob_storage_reader_cfg_handle'])
+
+    print("Goldman Sachs -> Post Revocation Registry Delta to Ledger")
+    gs['revoc_reg_entry_req'] = await ledger.build_revoc_reg_entry_request(gs['did'], gs['revoc_reg_id'], 'CL_ACCUM', gs['kyc_cred_rev_reg_delta'])
+    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['revoc_reg_entry_req'])
 
     print("Goldman Sachs -> Encrypt KYC Credential")
     gs['authcrypted_kyc_cred'] = await crypto.auth_crypt(gs['wallet'], gs['key_for_sig'], gs['sig_key_for_gs'], gs['kyc_cred'].encode('utf-8'))
@@ -208,13 +239,18 @@ async def decrypt_cred_request_from_sig__create_cred_for_sig__encrypt_cred__send
 
 async def decrypt_cred_from_gs__store_cred_in_wallet(sig):
     print("Two Sigma -> Decrypt KYC Credential from Goldman Sachs")
-    (_, sig['kyc_cred'], _) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['authcrypted_kyc_cred'])
+    (_, sig['kyc_cred'], kyc_cred) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['authcrypted_kyc_cred'])
 
     print("Two Sigma -> Get KYC Credential Definition from Ledger")
     (_, sig['kyc_cred_def']) = await get_cred_def(sig['pool'], sig['did_for_gs'], sig['kyc_cred_def_id'])
 
+    print("Two Sigma -> Get Revocation Registry Definition for KYC Credential from Ledger")
+    sig['revoc_reg_des_req'] = await ledger.build_get_revoc_reg_def_request(sig['did_for_gs'], kyc_cred['rev_reg_id'])
+    sig['revoc_reg_des_resp'] = await ledger.submit_request(sig['pool'], sig['revoc_reg_des_req'])
+    (sig['revoc_reg_def_id'], sig['revoc_reg_def_json']) = await ledger.parse_get_revoc_reg_def_response(sig['revoc_reg_des_resp'])
+
     print("Two Sigma -> Store KYC Credential in Wallet")
-    await anoncreds.prover_store_credential(sig['wallet'], None, sig['kyc_cred_request_metadata'], sig['kyc_cred'], sig['kyc_cred_def'], None)
+    await anoncreds.prover_store_credential(sig['wallet'], None, sig['kyc_cred_request_metadata'], sig['kyc_cred'], sig['kyc_cred_def'], sig['revoc_reg_def_json'])
 
 
 async def establish_connection_with_sig__create_cred_proof_request_for_sig__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig):
@@ -285,13 +321,19 @@ async def decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_
     (sig['kyc_schemas'], sig['kyc_cred_defs'], sig['kyc_revoc_states']) = await prover_get_entities_from_ledger(sig['pool'], sig['did_for_jp'], sig['creds_for_kyc_cred_proof'])
 
     print("Two Sigma -> Create KYC Credential Proof")
+    revoc_states_for_kyc_cred = json.loads(sig['kyc_revoc_states'])
+    timestamp_for_attr1 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_kyc_cred)
+    timestamp_for_attr2 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_kyc_cred)
+    timestamp_for_attr3 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_kyc_cred)
+    timestamp_for_attr4 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_kyc_cred)
+    timestamp_for_predicate1 = get_timestamp_for_attribute(cred_for_predicate1, revoc_states_for_kyc_cred)
     sig['kyc_cred_requested_creds'] = json.dumps({
         'self_attested_attributes': {},
-        'requested_attributes': {'attr1_referent': {'cred_id': cred_for_attr1['referent'], 'revealed': True},
-                                 'attr2_referent': {'cred_id': cred_for_attr2['referent'], 'revealed': True},
-                                 'attr3_referent': {'cred_id': cred_for_attr3['referent'], 'revealed': True},
-                                 'attr4_referent': {'cred_id': cred_for_attr4['referent'], 'revealed': True}},
-        'requested_predicates': {'predicate1_referent': {'cred_id': cred_for_predicate1['referent']}}
+        'requested_attributes': {'attr1_referent': {'cred_id': cred_for_attr1['referent'], 'revealed': True, 'timestamp': timestamp_for_attr1},
+                                 'attr2_referent': {'cred_id': cred_for_attr2['referent'], 'revealed': True, 'timestamp': timestamp_for_attr2},
+                                 'attr3_referent': {'cred_id': cred_for_attr3['referent'], 'revealed': True, 'timestamp': timestamp_for_attr3},
+                                 'attr4_referent': {'cred_id': cred_for_attr4['referent'], 'revealed': True, 'timestamp': timestamp_for_attr4}},
+        'requested_predicates': {'predicate1_referent': {'cred_id': cred_for_predicate1['referent'], 'timestamp': timestamp_for_predicate1}}
     })
     sig['kyc_cred_proof'] = await anoncreds.prover_create_proof(sig['wallet'], sig['kyc_cred_proof_request'], sig['kyc_cred_requested_creds'],
                                                                 sig['master_secret_id'], sig['kyc_schemas'], sig['kyc_cred_defs'], sig['kyc_revoc_states'])
@@ -303,7 +345,7 @@ async def decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_
     jp['authcrypted_kyc_cred_proof'] = sig['authcrypted_kyc_cred_proof']
 
 
-async def decrypt_cred_proof_from_sig__verify_cred_proof(jp):
+async def decrypt_cred_proof_from_sig__verify_cred_proof(jp, valid):
     print("JP Morgan -> Decrypt KYC Credential Proof from Two Sigma")
     (_, jp['kyc_cred_proof'], decrypted_kyc_cred_proof) = await auth_decrypt(jp['wallet'], jp['key_for_sig'], jp['authcrypted_kyc_cred_proof'])
     (jp['kyc_schemas'], jp['kyc_cred_defs'], jp['kyc_revoc_ref_defs'], jp['kyc_revoc_regs']) = await verifier_get_entities_from_ledger(jp['pool'], jp['did'],
@@ -314,8 +356,23 @@ async def decrypt_cred_proof_from_sig__verify_cred_proof(jp):
     assert '1102' == decrypted_kyc_cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
     assert '207A, Mulberry Woods, New York' == decrypted_kyc_cred_proof['requested_proof']['revealed_attrs']['attr3_referent']['raw']
     assert '2.8' == decrypted_kyc_cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
-    assert await anoncreds.verifier_verify_proof(jp['kyc_cred_proof_request'], jp['kyc_cred_proof'], jp['kyc_schemas'],
-                                                 jp['kyc_cred_defs'], jp['kyc_revoc_ref_defs'], jp['kyc_revoc_regs'])
+    if valid:
+        print("JP Morgan -> Verify KYC Credentials from Two Sigma are valid")
+        assert await anoncreds.verifier_verify_proof(jp['kyc_cred_proof_request'], jp['kyc_cred_proof'], jp['kyc_schemas'],
+                                                     jp['kyc_cred_defs'], jp['kyc_revoc_ref_defs'], jp['kyc_revoc_regs'])
+    else:
+        print("JP Morgan -> Verify KYC Credentials from Two Sigma are not valid")
+        assert not await anoncreds.verifier_verify_proof(jp['kyc_cred_proof_request'], jp['kyc_cred_proof'], jp['kyc_schemas'],
+                                                         jp['kyc_cred_defs'], jp['kyc_revoc_ref_defs'], jp['kyc_revoc_regs'])
+
+
+async def revoke_cred_for_sig(gs):
+    print("Goldman Sachs -> Revoke KYC Credential for Two Sigma")
+    gs['kyc_cred_rev_reg_delta'] = await anoncreds.issuer_revoke_credential(gs['wallet'], gs['blob_storage_reader_cfg_handle'], gs['revoc_reg_id'], gs['kyc_cred_rev_id'])
+
+    print("Goldman Sachs -> Post Revocation Registry Delta to Ledger")
+    gs['revoc_reg_entry_req'] = await ledger.build_revoc_reg_entry_request(gs['did'], gs['revoc_reg_id'], 'CL_ACCUM', gs['kyc_cred_rev_reg_delta'])
+    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['revoc_reg_entry_req'])
 
 
 async def tear_down(pool_, gov, sec, gs, jp, sig):
@@ -388,7 +445,7 @@ async def get_verinym(_from, _to):
     return to_did
 
 
-async def prover_get_entities_from_ledger(pool_handle, _did, identifiers):
+async def prover_get_entities_from_ledger(pool_handle, _did, identifiers, timestamp_from=None, timestamp_to=None):
     schemas = {}
     cred_defs = {}
     rev_states = {}
@@ -399,13 +456,23 @@ async def prover_get_entities_from_ledger(pool_handle, _did, identifiers):
         (received_cred_def_id, received_cred_def) = await get_cred_def(pool_handle, _did, item['cred_def_id'])
         cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
-        if 'rev_reg_seq_no' in item:
-            pass
+        if 'rev_reg_id' in item and item['rev_reg_id'] is not None:
+            get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, item['rev_reg_id'])
+            get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
+            (rev_reg_id, revoc_reg_def_json) = await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
+            if not timestamp_to: timestamp_to = int(time.time())
+            get_revoc_reg_delta_request = await ledger.build_get_revoc_reg_delta_request(_did, item['rev_reg_id'], timestamp_from, timestamp_to)
+            get_revoc_reg_delta_response = await ledger.submit_request(pool_handle, get_revoc_reg_delta_request)
+            (rev_reg_id, revoc_reg_delta_json, t) = await ledger.parse_get_revoc_reg_delta_response(get_revoc_reg_delta_response)
+            tails_reader_config = json.dumps({'base_dir': dirname(json.loads(revoc_reg_def_json)['value']['tailsLocation']), 'uri_pattern': ''})
+            blob_storage_reader_cfg_handle = await blob_storage.open_reader('default', tails_reader_config)
+            rev_state_json = await anoncreds.create_revocation_state(blob_storage_reader_cfg_handle, revoc_reg_def_json, revoc_reg_delta_json, t, item['cred_rev_id'])
+            rev_states[rev_reg_id] = {t: json.loads(rev_state_json)}
 
     return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_states)
 
 
-async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers):
+async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers, timestamp=None):
     schemas = {}
     cred_defs = {}
     rev_reg_defs = {}
@@ -417,8 +484,16 @@ async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers):
         (received_cred_def_id, received_cred_def) = await get_cred_def(pool_handle, _did, item['cred_def_id'])
         cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
-        if 'rev_reg_seq_no' in item:
-            pass
+        if 'rev_reg_id' in item and item['rev_reg_id'] is not None:
+            get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, item['rev_reg_id'])
+            get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
+            (rev_reg_id, revoc_reg_def_json) = await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
+            if not timestamp: timestamp = item['timestamp']
+            get_revoc_reg_request = await ledger.build_get_revoc_reg_request(_did, item['rev_reg_id'], timestamp)
+            get_revoc_reg_response = await ledger.submit_request(pool_handle, get_revoc_reg_request)
+            (rev_reg_id, rev_reg_json, timestamp2) = await ledger.parse_get_revoc_reg_response(get_revoc_reg_response)
+            rev_regs[rev_reg_id] = {timestamp2: json.loads(rev_reg_json)}
+            rev_reg_defs[rev_reg_id] = json.loads(revoc_reg_def_json)
 
     return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_reg_defs), json.dumps(rev_regs)
 
@@ -461,6 +536,13 @@ async def get_credential_for_referent(search_handle, referent):
     credentials = json.loads(
         await anoncreds.prover_fetch_credentials_for_proof_req(search_handle, referent, 10))
     return credentials[0]['cred_info']
+
+
+def get_timestamp_for_attribute(cred_for_attribute, revoc_states):
+    if cred_for_attribute['rev_reg_id'] in revoc_states:
+        return int(next(iter(revoc_states[cred_for_attribute['rev_reg_id']])))
+    else:
+        return None
 
 
 if __name__ == '__main__':
