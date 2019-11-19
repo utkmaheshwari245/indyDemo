@@ -35,7 +35,7 @@ async def run():
     print("========================================")
     print("=============== End Demo ===============")
     print("========================================")
-    await tear_down(gov, sec, gs, jp, sig, pool_)
+    await tear_down(pool_, gov, sec, gs, jp, sig)
     print("========================================")
 
 
@@ -318,7 +318,11 @@ async def decrypt_cred_proof_from_sig__verify_cred_proof(jp):
                                                  jp['kyc_cred_defs'], jp['kyc_revoc_ref_defs'], jp['kyc_revoc_regs'])
 
 
-async def tear_down(gov, sec, gs, jp, sig, pool_):
+async def tear_down(pool_, gov, sec, gs, jp, sig):
+    print("Close and Delete Pool")
+    await pool.close_pool_ledger(pool_['handle'])
+    await pool.delete_pool_ledger_config(pool_['name'])
+
     print("Close and Delete Government\'s Wallet")
     await wallet.close_wallet(gov['wallet'])
     await wallet.delete_wallet(gov['wallet_config'], gov['wallet_credentials'])
@@ -338,10 +342,6 @@ async def tear_down(gov, sec, gs, jp, sig, pool_):
     print("Close and Delete Two Sigma\'s Wallet")
     await wallet.close_wallet(sig['wallet'])
     await wallet.delete_wallet(sig['wallet_config'], sig['wallet_credentials'])
-
-    print("Close and Delete Pool")
-    await pool.close_pool_ledger(pool_['handle'])
-    await pool.delete_pool_ledger_config(pool_['name'])
 
 
 async def get_pseudonym(_from, _to):
