@@ -1,5 +1,5 @@
 ========================================
-================ Set Up ================
+============== Start Demo ==============
 ========================================
 Initialize Pool (Blockchain Ledger)
 Initialize Government (Blockchain Steward)
@@ -8,14 +8,19 @@ Initialize Goldman Sachs (KYC Credential Issuer)
 Initialize JP Morgan (KYC Credential Verifier)
 Initialize Two Sigma (KYC Credential Holder)
 ========================================
-============== Start Demo ==============
-========================================
 SEC -> Create KYC Credential Schema
 SEC -> Send KYC Credential Schema to Ledger
+SEC -> Send KYC Credential Schema Id to Goldman Sachs
 ========================================
 Goldman Sachs -> Get KYC Schema from Ledger
 Goldman Sachs -> Create and Store KYC Credential Definition in Wallet
 Goldman Sachs -> Send KYC Credential Definition to Ledger
+Goldman Sachs -> Send KYC Credential Definition Id to JP Morgan
+----------------------------------------
+Goldman Sachs -> Create Revocation Registry
+Goldman Sachs -> Post Revocation Registry Definition to Ledger
+Goldman Sachs -> Post Revocation Registry Entry to Ledger
+----------------------------------------
 Goldman Sachs -> Establish p2p connection with Two Sigma
 Goldman Sachs -> Create KYC Credential Offer for Two Sigma
 Goldman Sachs -> Get Two Sigma's key
@@ -31,11 +36,13 @@ Two Sigma -> Send encrypted KYC Credential Request to Goldman Sachs
 ========================================
 Goldman Sachs -> Decrypt KYC Credential Request from Two Sigma
 Goldman Sachs -> Create KYC Credential for Two Sigma
+Goldman Sachs -> Post Revocation Registry Delta to Ledger
 Goldman Sachs -> Encrypt KYC Credential
 Goldman Sachs -> Send encrypted KYC Credential to Two Sigma
 ========================================
 Two Sigma -> Decrypt KYC Credential from Goldman Sachs
 Two Sigma -> Get KYC Credential Definition from Ledger
+Two Sigma -> Get Revocation Registry Definition from Ledger
 Two Sigma -> Store KYC Credential in Wallet
 ========================================
 JP Morgan -> Establish p2p connection with Two Sigma
@@ -52,13 +59,33 @@ Two Sigma -> Send encrypted KYC Credential Proof to JP Morgan
 ========================================
 JP Morgan -> Decrypt KYC Credential Proof from Two Sigma
 JP Morgan -> Verify KYC Credential Proof from Two Sigma
+JP Morgan -> Verify KYC Credentials from Two Sigma are valid
 ========================================
-=============== End Demo ===============
+Goldman Sachs -> Revoke KYC Credential for Two Sigma
+Goldman Sachs -> Post Revocation Registry Delta to Ledger
 ========================================
+JP Morgan -> Establish p2p connection with Two Sigma
+JP Morgan -> Create KYC Credential Proof Request
+JP Morgan -> Get Two Sigma's key
+JP Morgan -> Encrypt KYC Credential Proof Request
+JP Morgan -> Send encrypted KYC Credential Proof Request to Two Sigma
+========================================
+Two Sigma -> Decrypt KYC Credential Proof Request from JP Morgan
+Two Sigma -> Get credentials for KYC Credential Proof Request
+Two Sigma -> Create KYC Credential Proof
+Two Sigma -> Encrypt KYC Credential Proof
+Two Sigma -> Send encrypted KYC Credential Proof to JP Morgan
+========================================
+JP Morgan -> Decrypt KYC Credential Proof from Two Sigma
+JP Morgan -> Verify KYC Credential Proof from Two Sigma
+JP Morgan -> Verify KYC Credentials from Two Sigma are not valid
+========================================
+Close and Delete Pool
 Close and Delete Government's Wallet
 Close and Delete SEC's Wallet
 Close and Delete Goldman Sachs's Wallet
 Close and Delete JP Morgan's Wallet
 Close and Delete Two Sigma's Wallet
-Close and Delete Pool
+========================================
+=============== End Demo ===============
 ========================================
