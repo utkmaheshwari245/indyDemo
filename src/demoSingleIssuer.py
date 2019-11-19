@@ -288,7 +288,8 @@ async def establish_connection_with_sig__create_cred_proof_request_for_sig__encr
                 'p_value': 3,
                 'restrictions': [{'cred_def_id': jp['kyc_cred_def_id']}]
             }
-        }
+        },
+        'non_revoked': {'to': int(time.time())}
     })
 
     print("JP Morgan -> Get Two Sigma\'s key")
@@ -318,7 +319,9 @@ async def decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_
                                        cred_for_attr3['referent']: cred_for_attr3,
                                        cred_for_attr4['referent']: cred_for_attr4,
                                        cred_for_predicate1['referent']: cred_for_predicate1}
-    (sig['kyc_schemas'], sig['kyc_cred_defs'], sig['kyc_revoc_states']) = await prover_get_entities_from_ledger(sig['pool'], sig['did_for_jp'], sig['creds_for_kyc_cred_proof'])
+    requested_timestamp = int(json.loads(sig['kyc_cred_proof_request'])['non_revoked']['to'])
+    (sig['kyc_schemas'], sig['kyc_cred_defs'], sig['kyc_revoc_states']) = await prover_get_entities_from_ledger(sig['pool'], sig['did_for_jp'], sig['creds_for_kyc_cred_proof'],
+                                                                                                                None, requested_timestamp)
 
     print("Two Sigma -> Create KYC Credential Proof")
     revoc_states_for_kyc_cred = json.loads(sig['kyc_revoc_states'])
@@ -348,8 +351,10 @@ async def decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_
 async def decrypt_cred_proof_from_sig__verify_cred_proof(jp, valid):
     print("JP Morgan -> Decrypt KYC Credential Proof from Two Sigma")
     (_, jp['kyc_cred_proof'], decrypted_kyc_cred_proof) = await auth_decrypt(jp['wallet'], jp['key_for_sig'], jp['authcrypted_kyc_cred_proof'])
+    requested_timestamp = int(json.loads(jp['kyc_cred_proof_request'])['non_revoked']['to'])
     (jp['kyc_schemas'], jp['kyc_cred_defs'], jp['kyc_revoc_ref_defs'], jp['kyc_revoc_regs']) = await verifier_get_entities_from_ledger(jp['pool'], jp['did'],
-                                                                                                                                       decrypted_kyc_cred_proof['identifiers'])
+                                                                                                                                       decrypted_kyc_cred_proof['identifiers'],
+                                                                                                                                       requested_timestamp)
 
     print("JP Morgan -> Verify KYC Credential Proof from Two Sigma")
     assert 'Two Sigma Coop.' == decrypted_kyc_cred_proof['requested_proof']['revealed_attrs']['attr1_referent']['raw']
