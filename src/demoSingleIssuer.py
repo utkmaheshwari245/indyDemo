@@ -573,8 +573,7 @@ async def get_revoc_reg_delta(pool_handle, _did, revoc_reg_id, timestamp_from, t
 
 
 async def get_credential_for_referent(search_handle, referent):
-    credentials = json.loads(
-        await anoncreds.prover_fetch_credentials_for_proof_req(search_handle, referent, 10))
+    credentials = json.loads(await anoncreds.prover_fetch_credentials_for_proof_req(search_handle, referent, 10))
     return credentials[0]['cred_info']
 
 
