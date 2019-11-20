@@ -22,7 +22,7 @@ async def run():
 
     await sig___decrypt_cred_offer_from_gs__create_cred_request_for_gs__encrypt_cred_request__send_cred_request_to_gs(sig, gs)
 
-    await gs___decrypt_cred_request_from_sig__create_cred_for_sig__post_revocation_registry_delta_to_ledger__encrypt_cred__send_cred_to_sig(gs, sig)
+    await gs___decrypt_cred_request_from_sig__create_cred_for_sig__post_revocation_registry_entry_to_ledger__encrypt_cred__send_cred_to_sig(gs, sig)
 
     await sig___decrypt_cred_from_gs__get_revocation_registry_definition_from_ledger__store_cred_in_wallet(sig)
 
@@ -169,12 +169,10 @@ async def gs___create_revocation_registry__post_revocation_registry_to_ledger__p
                                                                                                                                         cred_revoc_reg_config, tails_writer)
 
     print("Goldman Sachs -> Post Revocation Registry Definition to Ledger")
-    gs['cred_revoc_reg_def_request'] = await ledger.build_revoc_reg_def_request(gs['did'], gs['cred_revoc_reg_def'])
-    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_def_request'])
+    await send_revoc_reg_def(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_def'])
 
     print("Goldman Sachs -> Post Revocation Registry Entry to Ledger")
-    gs['cred_revoc_reg_entry_request'] = await ledger.build_revoc_reg_entry_request(gs['did'], gs['cred_revoc_reg_id'], 'CL_ACCUM', gs['cred_revoc_reg_entry'])
-    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_entry_request'])
+    await send_revoc_reg_entry(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], 'CL_ACCUM', gs['cred_revoc_reg_entry'])
 
     print("----------------------------------------")
 
@@ -222,7 +220,7 @@ async def sig___decrypt_cred_offer_from_gs__create_cred_request_for_gs__encrypt_
     print("========================================")
 
 
-async def gs___decrypt_cred_request_from_sig__create_cred_for_sig__post_revocation_registry_delta_to_ledger__encrypt_cred__send_cred_to_sig(gs, sig):
+async def gs___decrypt_cred_request_from_sig__create_cred_for_sig__post_revocation_registry_entry_to_ledger__encrypt_cred__send_cred_to_sig(gs, sig):
     print("Goldman Sachs -> Decrypt KYC Credential Request from Two Sigma")
     (gs['sig_key_for_gs'], gs['cred_request'], _) = await auth_decrypt(gs['wallet'], gs['key_for_sig'], gs['authcrypted_cred_request'])
 
@@ -235,12 +233,11 @@ async def gs___decrypt_cred_request_from_sig__create_cred_for_sig__post_revocati
         "rating": {"raw": "4", "encoded": "4"}
     })
     gs['blob_storage_reader_cfg_handle'] = await blob_storage.open_reader('default', gs['tails_writer_config'])
-    (gs['cred'], gs['cred_rev_id'], gs['cred_rev_reg_delta']) = await anoncreds.issuer_create_credential(gs['wallet'], gs['cred_offer'], gs['cred_request'], gs['sig_cred_values'],
+    (gs['cred'], gs['cred_rev_id'], gs['cred_rev_reg_entry']) = await anoncreds.issuer_create_credential(gs['wallet'], gs['cred_offer'], gs['cred_request'], gs['sig_cred_values'],
                                                                                                          gs['cred_revoc_reg_id'], gs['blob_storage_reader_cfg_handle'])
 
-    print("Goldman Sachs -> Post Revocation Registry Delta to Ledger")
-    gs['revoc_reg_entry_req'] = await ledger.build_revoc_reg_entry_request(gs['did'], gs['cred_revoc_reg_id'], 'CL_ACCUM', gs['cred_rev_reg_delta'])
-    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['revoc_reg_entry_req'])
+    print("Goldman Sachs -> Post Revocation Registry Entry to Ledger")
+    await send_revoc_reg_entry(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], 'CL_ACCUM', gs['cred_rev_reg_entry'])
 
     print("Goldman Sachs -> Encrypt KYC Credential")
     gs['authcrypted_cred'] = await crypto.auth_crypt(gs['wallet'], gs['key_for_sig'], gs['sig_key_for_gs'], gs['cred'].encode('utf-8'))
@@ -259,7 +256,7 @@ async def sig___decrypt_cred_from_gs__get_revocation_registry_definition_from_le
     (_, sig['cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['cred_def_id'])
 
     print("Two Sigma -> Get Revocation Registry Definition from Ledger")
-    (_, sig['revoc_reg_def_json']) = await get_revoc_reg(sig['pool'], sig['did'], cred['rev_reg_id'])
+    (_, sig['revoc_reg_def_json']) = await get_revoc_reg_def(sig['pool'], sig['did'], cred['rev_reg_id'])
 
     print("Two Sigma -> Store KYC Credential in Wallet")
     await anoncreds.prover_store_credential(sig['wallet'], None, sig['cred_request_metadata'], sig['cred'], sig['cred_def'], sig['revoc_reg_def_json'])
@@ -390,11 +387,10 @@ async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, valid):
 
 async def gs___revoke_cred_for_sig(gs):
     print("Goldman Sachs -> Revoke KYC Credential for Two Sigma")
-    gs['cred_rev_reg_delta'] = await anoncreds.issuer_revoke_credential(gs['wallet'], gs['blob_storage_reader_cfg_handle'], gs['cred_revoc_reg_id'], gs['cred_rev_id'])
+    gs['cred_rev_reg_entry'] = await anoncreds.issuer_revoke_credential(gs['wallet'], gs['blob_storage_reader_cfg_handle'], gs['cred_revoc_reg_id'], gs['cred_rev_id'])
 
-    print("Goldman Sachs -> Post Revocation Registry Delta to Ledger")
-    gs['revoc_reg_entry_req'] = await ledger.build_revoc_reg_entry_request(gs['did'], gs['cred_revoc_reg_id'], 'CL_ACCUM', gs['cred_rev_reg_delta'])
-    await ledger.sign_and_submit_request(gs['pool'], gs['wallet'], gs['did'], gs['revoc_reg_entry_req'])
+    print("Goldman Sachs -> Post Revocation Registry Entry to Ledger")
+    await send_revoc_reg_entry(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], 'CL_ACCUM', gs['cred_rev_reg_entry'])
 
     print("========================================")
 
@@ -481,13 +477,9 @@ async def prover_get_entities_from_ledger(pool_handle, _did, identifiers, timest
         cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
         if 'rev_reg_id' in item and item['rev_reg_id'] is not None:
-            get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, item['rev_reg_id'])
-            get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
-            (rev_reg_id, revoc_reg_def_json) = await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
+            (rev_reg_id, revoc_reg_def_json) = await get_revoc_reg_def(pool_handle, _did, item['rev_reg_id'])
             if not timestamp_to: timestamp_to = int(time.time())
-            get_revoc_reg_delta_request = await ledger.build_get_revoc_reg_delta_request(_did, item['rev_reg_id'], timestamp_from, timestamp_to)
-            get_revoc_reg_delta_response = await ledger.submit_request(pool_handle, get_revoc_reg_delta_request)
-            (rev_reg_id, revoc_reg_delta_json, t) = await ledger.parse_get_revoc_reg_delta_response(get_revoc_reg_delta_response)
+            (rev_reg_id, revoc_reg_delta_json, t) = await get_revoc_reg_delta(pool_handle, _did, item['rev_reg_id'], timestamp_from, timestamp_to)
             tails_reader_config = json.dumps({'base_dir': dirname(json.loads(revoc_reg_def_json)['value']['tailsLocation']), 'uri_pattern': ''})
             blob_storage_reader_cfg_handle = await blob_storage.open_reader('default', tails_reader_config)
             rev_state_json = await anoncreds.create_revocation_state(blob_storage_reader_cfg_handle, revoc_reg_def_json, revoc_reg_delta_json, t, item['cred_rev_id'])
@@ -509,13 +501,9 @@ async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers, time
         cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
         if 'rev_reg_id' in item and item['rev_reg_id'] is not None:
-            get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, item['rev_reg_id'])
-            get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
-            (rev_reg_id, revoc_reg_def_json) = await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
+            (rev_reg_id, revoc_reg_def_json) = await get_revoc_reg_def(pool_handle, _did, item['rev_reg_id'])
             if not timestamp: timestamp = item['timestamp']
-            get_revoc_reg_request = await ledger.build_get_revoc_reg_request(_did, item['rev_reg_id'], timestamp)
-            get_revoc_reg_response = await ledger.submit_request(pool_handle, get_revoc_reg_request)
-            (rev_reg_id, rev_reg_json, timestamp2) = await ledger.parse_get_revoc_reg_response(get_revoc_reg_response)
+            (rev_reg_id, rev_reg_json, timestamp2) = await get_revoc_reg(pool_handle, _did, item['rev_reg_id'], timestamp)
             rev_regs[rev_reg_id] = {timestamp2: json.loads(rev_reg_json)}
             rev_reg_defs[rev_reg_id] = json.loads(revoc_reg_def_json)
 
@@ -544,6 +532,16 @@ async def send_cred_def(pool_handle, wallet_handle, _did, cred_def_json):
     await ledger.sign_and_submit_request(pool_handle, wallet_handle, _did, cred_def_request)
 
 
+async def send_revoc_reg_def(pool_handle, wallet_handle, _did, revoc_reg_def):
+    revoc_reg_def_request = await ledger.build_revoc_reg_def_request(_did, revoc_reg_def)
+    await ledger.sign_and_submit_request(pool_handle, wallet_handle, _did, revoc_reg_def_request)
+
+
+async def send_revoc_reg_entry(pool_handle, wallet_handle, _did, revoc_reg_id, mode, revoc_reg_entry):
+    revoc_reg_entry_request = await ledger.build_revoc_reg_entry_request(_did, revoc_reg_id, mode, revoc_reg_entry)
+    await ledger.sign_and_submit_request(pool_handle, wallet_handle, _did, revoc_reg_entry_request)
+
+
 async def get_schema(pool_handle, _did, schema_id):
     get_schema_request = await ledger.build_get_schema_request(_did, schema_id)
     get_schema_response = await ledger.submit_request(pool_handle, get_schema_request)
@@ -556,10 +554,22 @@ async def get_cred_def(pool_handle, _did, cred_def_id):
     return await ledger.parse_get_cred_def_response(get_cred_def_response)
 
 
-async def get_revoc_reg(pool_handle, _did, revoc_reg_id):
+async def get_revoc_reg_def(pool_handle, _did, revoc_reg_id):
     get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, revoc_reg_id)
     get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
     return await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
+
+
+async def get_revoc_reg(pool_handle, _did, revoc_reg_id, timestamp):
+    get_revoc_reg_request = await ledger.build_get_revoc_reg_request(_did, revoc_reg_id, timestamp)
+    get_revoc_reg_response = await ledger.submit_request(pool_handle, get_revoc_reg_request)
+    return await ledger.parse_get_revoc_reg_response(get_revoc_reg_response)
+
+
+async def get_revoc_reg_delta(pool_handle, _did, revoc_reg_id, timestamp_from, timestamp_to):
+    get_revoc_reg_delta_request = await ledger.build_get_revoc_reg_delta_request(_did, revoc_reg_id, timestamp_from, timestamp_to)
+    get_revoc_reg_delta_response = await ledger.submit_request(pool_handle, get_revoc_reg_delta_request)
+    return await ledger.parse_get_revoc_reg_delta_response(get_revoc_reg_delta_response)
 
 
 async def get_credential_for_referent(search_handle, referent):
