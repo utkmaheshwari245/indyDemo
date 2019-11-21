@@ -2,6 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e5620b44-0662-4777-8c6b-af869e827eff" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/cred.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/log.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/revoke.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/temp.json.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/demoSingleIssuer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/demoSingleIssuer.py" afterDir="false" />
     </list>
