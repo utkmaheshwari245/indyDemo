@@ -30,7 +30,7 @@ async def run():
 
     await sig___decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
 
-    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
+    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, False)
 
     await gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
 
@@ -38,7 +38,7 @@ async def run():
 
     await sig___decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
 
-    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, False)
+    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
 
     await system___tear_down(pool_, gov, sec, gs, jp, sig)
 
@@ -318,13 +318,12 @@ async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__en
     (sig['jp_key_for_sig'], sig['cred_proof_request'], _) = await auth_decrypt(sig['wallet'], sig['key_for_jp'], sig['authcrypted_cred_proof_request'])
 
     print("Two Sigma -> Get credentials for KYC Credential Proof Request")
-    search_for_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(sig['wallet'], sig['cred_proof_request'], None)
-    cred_for_attr1 = await get_credential_for_referent(search_for_cred_proof_request, 'attr1_referent')
-    cred_for_attr2 = await get_credential_for_referent(search_for_cred_proof_request, 'attr2_referent')
-    cred_for_attr3 = await get_credential_for_referent(search_for_cred_proof_request, 'attr3_referent')
-    cred_for_attr4 = await get_credential_for_referent(search_for_cred_proof_request, 'attr4_referent')
-    cred_for_predicate1 = await get_credential_for_referent(search_for_cred_proof_request, 'predicate1_referent')
-    await anoncreds.prover_close_credentials_search_for_proof_req(search_for_cred_proof_request)
+    requested_credentials = json.loads(await anoncreds.prover_get_credentials_for_proof_req(sig['wallet'], sig['cred_proof_request']))
+    cred_for_attr1 = requested_credentials['attrs']['attr1_referent'][0]['cred_info']
+    cred_for_attr2 = requested_credentials['attrs']['attr2_referent'][0]['cred_info']
+    cred_for_attr3 = requested_credentials['attrs']['attr3_referent'][0]['cred_info']
+    cred_for_attr4 = requested_credentials['attrs']['attr4_referent'][0]['cred_info']
+    cred_for_predicate1 = requested_credentials['predicates']['predicate1_referent'][0]['cred_info']
     sig['creds_for_cred_proof'] = {cred_for_attr1['referent']: cred_for_attr1,
                                    cred_for_attr2['referent']: cred_for_attr2,
                                    cred_for_attr3['referent']: cred_for_attr3,
@@ -361,24 +360,25 @@ async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof_for_jp__en
     print("========================================")
 
 
-async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, valid):
+async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, revoked):
     print("JP Morgan -> Decrypt KYC Credential Proof from Two Sigma")
     (_, jp['cred_proof'], cred_proof) = await auth_decrypt(jp['wallet'], jp['key_for_sig'], jp['authcrypted_cred_proof'])
     requested_timestamp = int(json.loads(jp['cred_proof_request'])['non_revoked']['to'])
     (jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs']) = await verifier_get_entities_from_ledger(jp['pool'], jp['did'], cred_proof['identifiers'],
                                                                                                                                       requested_timestamp)
 
-    print("JP Morgan -> Verify KYC Credential Proof from Two Sigma")
-    assert 'Two Sigma Coop.' == cred_proof['requested_proof']['revealed_attrs']['attr1_referent']['raw']
-    assert '1102' == cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
-    assert '207A, Mulberry Woods, New York' == cred_proof['requested_proof']['revealed_attrs']['attr3_referent']['raw']
-    assert '2.8' == cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
-    if valid:
+    if revoked:
+        print("JP Morgan -> Verify KYC Credentials from Two Sigma are revoked")
+        assert not await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
+    else:
         print("JP Morgan -> Verify KYC Credentials from Two Sigma are valid")
         assert await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
-    else:
-        print("JP Morgan -> Verify KYC Credentials from Two Sigma are not valid")
-        assert not await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
+
+        print("JP Morgan -> Verify KYC Credential Proof from Two Sigma")
+        assert 'Two Sigma Coop.' == cred_proof['requested_proof']['revealed_attrs']['attr1_referent']['raw']
+        assert '1102' == cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
+        assert '207A, Mulberry Woods, New York' == cred_proof['requested_proof']['revealed_attrs']['attr3_referent']['raw']
+        assert '2.8' == cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
 
     print("========================================")
 
@@ -568,11 +568,6 @@ async def get_revoc_reg_delta(pool_handle, _did, revoc_reg_id, timestamp_from, t
     get_revoc_reg_delta_request = await ledger.build_get_revoc_reg_delta_request(_did, revoc_reg_id, timestamp_from, timestamp_to)
     get_revoc_reg_delta_response = await ledger.submit_request(pool_handle, get_revoc_reg_delta_request)
     return await ledger.parse_get_revoc_reg_delta_response(get_revoc_reg_delta_response)
-
-
-async def get_credential_for_referent(search_handle, referent):
-    credentials = json.loads(await anoncreds.prover_fetch_credentials_for_proof_req(search_handle, referent, 10))
-    return credentials[0]['cred_info']
 
 
 def get_timestamp_for_attribute(cred_for_attribute, revoc_states):

@@ -58,8 +58,8 @@ Two Sigma -> Encrypt KYC Credential Proof
 Two Sigma -> Send encrypted KYC Credential Proof to JP Morgan
 ========================================
 JP Morgan -> Decrypt KYC Credential Proof from Two Sigma
-JP Morgan -> Verify KYC Credential Proof from Two Sigma
 JP Morgan -> Verify KYC Credentials from Two Sigma are valid
+JP Morgan -> Verify KYC Credential Proof from Two Sigma
 ========================================
 Goldman Sachs -> Revoke KYC Credential for Two Sigma
 Goldman Sachs -> Post Revocation Registry Delta to Ledger
@@ -77,8 +77,7 @@ Two Sigma -> Encrypt KYC Credential Proof
 Two Sigma -> Send encrypted KYC Credential Proof to JP Morgan
 ========================================
 JP Morgan -> Decrypt KYC Credential Proof from Two Sigma
-JP Morgan -> Verify KYC Credential Proof from Two Sigma
-JP Morgan -> Verify KYC Credentials from Two Sigma are not valid
+JP Morgan -> Verify KYC Credentials from Two Sigma are revoked
 ========================================
 Close and Delete Pool
 Close and Delete Government's Wallet
