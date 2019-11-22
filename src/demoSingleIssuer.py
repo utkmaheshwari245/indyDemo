@@ -12,9 +12,9 @@ async def run():
     print("============== Start Demo ==============")
     print("========================================")
 
-    (pool_, gov, sec, gs, jp, sig) = await system___set_up()
+    (pool_, gov, gs, jp, sig) = await system___set_up()
 
-    await sec___create_cred_schema__send_cred_schema_to_ledger__send_cred_schema_id_to_gs(sec, gs)
+    await gov___create_cred_schema__send_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs)
 
     await gs___get_cred_schema_from_ledger__create_cred_definition__send_cred_definition_to_ledger__send_cred_definition_id_to_jp(gs, jp)
     await gs___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(gs)
@@ -40,7 +40,7 @@ async def run():
 
     await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
 
-    await system___tear_down(pool_, gov, sec, gs, jp, sig)
+    await system___tear_down(pool_, gov, gs, jp, sig)
 
     print("========================================")
     print("=============== End Demo ===============")
@@ -69,17 +69,6 @@ async def system___set_up():
     gov['wallet'] = await wallet.open_wallet(gov['wallet_config'], gov['wallet_credentials'])
     gov['did_info'] = json.dumps({'seed': gov['seed']})
     (gov['did'], gov['key']) = await did.create_and_store_my_did(gov['wallet'], gov['did_info'])
-
-    print('Initialize SEC (KYC Schema Creater)')
-    sec = {
-        'name': 'sec',
-        'wallet_config': json.dumps({'id': 'sec_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'sec_wallet_key'}),
-        'pool': pool_['handle'],
-        'role': 'TRUST_ANCHOR'
-    }
-    (gov['did_for_sec'], gov['key_for_sec'], sec['did_for_gov'], sec['key_for_gov'], _) = await get_pseudonym(gov, sec)
-    sec['did'] = await get_verinym(gov, sec)
 
     print('Initialize Goldman Sachs (KYC Credential Issuer)')
     gs = {
@@ -116,23 +105,23 @@ async def system___set_up():
 
     print("========================================")
 
-    return (pool_, gov, sec, gs, jp, sig)
+    return (pool_, gov, gs, jp, sig)
 
 
-async def sec___create_cred_schema__send_cred_schema_to_ledger__send_cred_schema_id_to_gs(sec, gs):
-    print("SEC -> Create KYC Credential Schema")
+async def gov___create_cred_schema__send_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs):
+    print("Government -> Create KYC Credential Schema")
     cred_schema = {
         'name': 'KYC',
         'version': '1.2',
         'attributes': ['legalName', 'primarySicCode', 'address', 'liquidity', 'rating']
     }
-    (sec['cred_schema_id'], sec['cred_schema']) = await anoncreds.issuer_create_schema(sec['did'], cred_schema['name'], cred_schema['version'], json.dumps(cred_schema['attributes']))
+    (gov['cred_schema_id'], gov['cred_schema']) = await anoncreds.issuer_create_schema(gov['did'], cred_schema['name'], cred_schema['version'], json.dumps(cred_schema['attributes']))
 
-    print("SEC -> Send KYC Credential Schema to Ledger")
-    await send_schema(sec['pool'], sec['wallet'], sec['did'], sec['cred_schema'])
+    print("Government -> Send KYC Credential Schema to Ledger")
+    await send_schema(gov['pool'], gov['wallet'], gov['did'], gov['cred_schema'])
 
-    print("SEC -> Send KYC Credential Schema Id to Goldman Sachs")
-    gs['cred_schema_id'] = sec['cred_schema_id']
+    print("Government -> Send KYC Credential Schema Id to Goldman Sachs")
+    gs['cred_schema_id'] = gov['cred_schema_id']
 
     print("========================================")
 
@@ -393,7 +382,7 @@ async def gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
     print("========================================")
 
 
-async def system___tear_down(pool_, gov, sec, gs, jp, sig):
+async def system___tear_down(pool_, gov, gs, jp, sig):
     print("Close and Delete Pool")
     await pool.close_pool_ledger(pool_['handle'])
     await pool.delete_pool_ledger_config(pool_['name'])
@@ -401,10 +390,6 @@ async def system___tear_down(pool_, gov, sec, gs, jp, sig):
     print("Close and Delete Government\'s Wallet")
     await wallet.close_wallet(gov['wallet'])
     await wallet.delete_wallet(gov['wallet_config'], gov['wallet_credentials'])
-
-    print("Close and Delete SEC\'s Wallet")
-    await wallet.close_wallet(sec['wallet'])
-    await wallet.delete_wallet(sec['wallet_config'], sec['wallet_credentials'])
 
     print("Close and Delete Goldman Sachs\'s Wallet")
     await wallet.close_wallet(gs['wallet'])

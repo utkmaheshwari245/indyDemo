@@ -2,9 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e5620b44-0662-4777-8c6b-af869e827eff" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/demo.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/demoSingleIssuer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/demoSingleIssuer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/logSingleIssuer.txt" beforeDir="false" afterPath="$PROJECT_DIR$/src/logSingleIssuer.txt" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -84,7 +84,14 @@
       <option name="project" value="LOCAL" />
       <updated>1574334150009</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="replace search and fetch with get">
+      <created>1574342377115</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1574342377115</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.History.Properties">
@@ -116,6 +123,7 @@
     <MESSAGE value="work3" />
     <MESSAGE value="work4" />
     <MESSAGE value="minor refactor" />
-    <option name="LAST_COMMIT_MESSAGE" value="minor refactor" />
+    <MESSAGE value="replace search and fetch with get" />
+    <option name="LAST_COMMIT_MESSAGE" value="replace search and fetch with get" />
   </component>
 </project>

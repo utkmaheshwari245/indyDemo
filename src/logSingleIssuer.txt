@@ -3,14 +3,13 @@
 ========================================
 Initialize Pool (Blockchain Ledger)
 Initialize Government (Blockchain Steward)
-Initialize SEC (KYC Schema Creater)
 Initialize Goldman Sachs (KYC Credential Issuer)
 Initialize JP Morgan (KYC Credential Verifier)
 Initialize Two Sigma (KYC Credential Holder)
 ========================================
-SEC -> Create KYC Credential Schema
-SEC -> Send KYC Credential Schema to Ledger
-SEC -> Send KYC Credential Schema Id to Goldman Sachs
+Government -> Create KYC Credential Schema
+Government -> Send KYC Credential Schema to Ledger
+Government -> Send KYC Credential Schema Id to Goldman Sachs
 ========================================
 Goldman Sachs -> Get KYC Schema from Ledger
 Goldman Sachs -> Create and Store KYC Credential Definition in Wallet
@@ -81,7 +80,6 @@ JP Morgan -> Verify KYC Credentials from Two Sigma are revoked
 ========================================
 Close and Delete Pool
 Close and Delete Government's Wallet
-Close and Delete SEC's Wallet
 Close and Delete Goldman Sachs's Wallet
 Close and Delete JP Morgan's Wallet
 Close and Delete Two Sigma's Wallet
