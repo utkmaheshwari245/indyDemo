@@ -43,7 +43,7 @@ async def run():
     await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
     input("")
     await system___tear_down(pool_, gov, gs, jp, sig)
-    input("")
+
     print("========================================")
     print("=============== End Demo ===============")
     print("========================================")
@@ -185,7 +185,6 @@ async def gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_of
 async def sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_request__send_cred_request_to_gs(sig, gs):
     print("Two Sigma -> Decrypt KYC Credential Offer from Goldman Sachs")
     (sig['gs_key_for_sig'], sig['cred_offer'], authdecrypted_cred_offer) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['authcrypted_cred_offer'])
-    sig['cred_schema_id'] = authdecrypted_cred_offer['schema_id']
     sig['cred_def_id'] = authdecrypted_cred_offer['cred_def_id']
 
     print("Two Sigma -> Create KYC Credential Request")
