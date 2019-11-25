@@ -111,7 +111,7 @@ async def system___set_up():
 
 
 async def gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs):
-    print("Government -> Create KYC Credential Schema : ['legalName', 'primarySicCode', 'address', 'liquidity', 'rating']")
+    print("Government -> Create KYC Credential Schema : {legalName, primarySicCode, address, liquidity, rating}")
     cred_schema = {
         'name': 'KYC',
         'version': '1.2',
@@ -207,7 +207,7 @@ async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cr
     print("Goldman Sachs -> Decrypt KYC Credential Request from Two Sigma")
     (gs['sig_key_for_gs'], gs['cred_request'], _) = await auth_decrypt(gs['wallet'], gs['key_for_sig'], gs['authcrypted_cred_request'])
 
-    print("Goldman Sachs -> Create KYC Credential")
+    print("Goldman Sachs -> Create KYC Credential : {legalName: Two Sigma Coop., primarySicCode: 1102, address: 207A, Mulberry Woods, New York, liquidity: 2.8, rating: 4}")
     gs['sig_cred_values'] = json.dumps({
         "legalName": {"raw": "Two Sigma Coop.", "encoded": "00010203040506070809"},
         "primarySicCode": {"raw": "1102", "encoded": "1102"},
@@ -247,7 +247,7 @@ async def jp___establish_connection_with_sig__create_cred_proof_request__encrypt
     print("JP Morgan -> Establish p2p connection with Two Sigma")
     (jp['did_for_sig'], jp['key_for_sig'], sig['did_for_jp'], sig['key_for_jp'], jp['sig_connection_response']) = await get_pseudonym(jp, sig)
 
-    print("JP Morgan -> Create KYC Credential Proof Request")
+    print("JP Morgan -> Create KYC Credential Proof Request : {legalName, primarySicCode, address, liquidity, rating>=3}")
     nonce1 = await anoncreds.generate_nonce()
     jp['cred_proof_request'] = json.dumps({
         'nonce': nonce1,
