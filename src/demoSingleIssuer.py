@@ -80,8 +80,8 @@ async def system___set_up():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    (gov['did_for_gs'], gov['key_for_gs'], gs['did_for_gov'], gs['key_for_gov'], _) = await get_pseudonym(gov, gs)
-    gs['did'] = await get_verinym(gov, gs)
+    await get_pseudonym(gov, gs)
+    await get_verinym(gov, gs)
 
     print('Initialize JP Morgan (KYC Credential Verifier)')
     jp = {
@@ -91,8 +91,8 @@ async def system___set_up():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    (gov['did_for_jp'], gov['key_for_jp'], jp['did_for_gov'], jp['key_for_gov'], _) = await get_pseudonym(gov, jp)
-    jp['did'] = await get_verinym(gov, jp)
+    await get_pseudonym(gov, jp)
+    await get_verinym(gov, jp)
 
     print('Initialize Two Sigma (KYC Credential Holder)')
     sig = {
@@ -102,8 +102,8 @@ async def system___set_up():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
-    (gov['did_for_sig'], gov['key_for_sig'], sig['did_for_gov'], sig['key_for_gov'], _) = await get_pseudonym(gov, sig)
-    sig['did'] = await get_verinym(gov, sig)
+    await get_pseudonym(gov, sig)
+    await get_verinym(gov, sig)
 
     print('========================================')
 
@@ -167,13 +167,13 @@ async def gs___create_revocation_registry__post_revocation_registry_definition_t
 
 async def gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(gs, sig):
     print('Goldman Sachs -> Establish p2p connection with Two Sigma')
-    (gs['did_for_sig'], gs['key_for_sig'], sig['did_for_gs'], sig['key_for_gs'], gs['sig_connection_response']) = await get_pseudonym(gs, sig)
+    await get_pseudonym(gs, sig)
 
     print('Goldman Sachs -> Create KYC Credential Offer')
     gs['cred_offer'] = await anoncreds.issuer_create_credential_offer(gs['wallet'], gs['cred_def_id'])
 
     print('Goldman Sachs -> Encrypt KYC Credential Offer')
-    gs['sig_key_for_gs'] = await did.key_for_did(gs['pool'], gs['wallet'], gs['sig_connection_response']['did'])
+    gs['sig_key_for_gs'] = await did.key_for_did(gs['pool'], gs['wallet'], gs['connection_response']['did'])
     gs['authcrypted_cred_offer'] = await crypto.auth_crypt(gs['wallet'], gs['key_for_sig'], gs['sig_key_for_gs'], gs['cred_offer'].encode('utf-8'))
 
     print('Goldman Sachs -> Send Encrypted KYC Credential Offer to Two Sigma')
@@ -244,7 +244,7 @@ async def sig___decrypt_cred_from_gs__store_cred_in_wallet(sig):
 
 async def jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig):
     print('JP Morgan -> Establish p2p connection with Two Sigma')
-    (jp['did_for_sig'], jp['key_for_sig'], sig['did_for_jp'], sig['key_for_jp'], jp['sig_connection_response']) = await get_pseudonym(jp, sig)
+    await get_pseudonym(jp, sig)
 
     print('JP Morgan -> Create KYC Credential Proof Request : {legalName, primarySicCode, address, liquidity, rating>=3}')
     nonce = await anoncreds.generate_nonce()
@@ -282,7 +282,7 @@ async def jp___establish_connection_with_sig__create_cred_proof_request__encrypt
     })
 
     print('JP Morgan -> Encrypt KYC Credential Proof Request')
-    jp['sig_key_for_jp'] = await did.key_for_did(jp['pool'], jp['wallet'], jp['sig_connection_response']['did'])
+    jp['sig_key_for_jp'] = await did.key_for_did(jp['pool'], jp['wallet'], jp['connection_response']['did'])
     jp['authcrypted_cred_proof_request'] = await crypto.auth_crypt(jp['wallet'], jp['key_for_sig'], jp['sig_key_for_jp'], jp['cred_proof_request'].encode('utf-8'))
 
     print('JP Morgan -> Send encrypted KYC Credential Proof Request to Two Sigma')
@@ -393,49 +393,74 @@ async def system___tear_down(pool_, gov, gs, jp, sig):
     await wallet.delete_wallet(sig['wallet_config'], sig['wallet_credentials'])
 
 
-async def get_pseudonym(_from, _to):
-    (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], '{}')
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], from_to_did, from_to_key, None)
+async def from___create_did_and_key__post_did_and_key_to_ledger__send_did_and_nonce_to_to(_from, _to):
+    did_for_to = 'did_for_' + _to['name']
+    key_for_to = 'key_for_' + _to['name']
+    (_from[did_for_to], _from[key_for_to]) = await did.create_and_store_my_did(_from['wallet'], '{}')
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], _from[did_for_to], _from[key_for_to], None)
+
     nonce = await anoncreds.generate_nonce()
-    _from['connection_request'] = {'did': from_to_did, 'nonce': nonce}
+    _from['connection_request'] = {'did': _from[did_for_to], 'nonce': nonce}
     _to['connection_request'] = _from['connection_request']
 
+
+async def to___create_wallet__create_did_and_key__encrypt_did_and_key_and_nonce__send_did_and_key_and_nonce_to_from(_to, _from):
     if 'wallet' not in _to:
         await wallet.create_wallet(_to['wallet_config'], _to['wallet_credentials'])
         _to['wallet'] = await wallet.open_wallet(_to['wallet_config'], _to['wallet_credentials'])
-    (to_from_did, to_from_key) = await did.create_and_store_my_did(_to['wallet'], '{}')
+
+    did_for_from = 'did_for_' + _from['name']
+    key_for_from = 'key_for_' + _from['name']
+    (_to[did_for_from], _to[key_for_from]) = await did.create_and_store_my_did(_to['wallet'], '{}')
+
     _to['connection_response'] = json.dumps({
-        'did': to_from_did,
-        'verkey': to_from_key,
+        'did': _to[did_for_from],
+        'key': _to[key_for_from],
         'nonce': _to['connection_request']['nonce']
     })
-    from_to_verkey = await did.key_for_did(_to['pool'], _to['wallet'], _to['connection_request']['did'])
-    _to['anoncrypted_connection_response'] = await crypto.anon_crypt(from_to_verkey, _to['connection_response'].encode('utf-8'))
+    _to['key_of_from_for_to'] = await did.key_for_did(_to['pool'], _to['wallet'], _to['connection_request']['did'])
+    _to['anoncrypted_connection_response'] = await crypto.anon_crypt(_to['key_of_from_for_to'], _to['connection_response'].encode('utf-8'))
+
     _from['anoncrypted_connection_response'] = _to['anoncrypted_connection_response']
 
-    _from['connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'], from_to_key, _from['anoncrypted_connection_response'])).decode('utf-8'))
-    assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], to_from_did, to_from_key, None)
 
-    return (from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response'])
+async def from___decrypt_did_and_key_and_nonce__verify_nonce__post_did_and_key_to_ledger(_from, _to):
+    key_for_to = 'key_for_' + _to['name']
+    _from['connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'], _from[key_for_to], _from['anoncrypted_connection_response'])).decode('utf-8'))
+
+    assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
+
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], _from['connection_response']['did'], _from['connection_response']['key'], None)
+
+
+async def to___create_did_and_key__encrypt_did_and_key_and_role__send_did_and_key_and_role_to_from(_to, _from):
+    (_to['did'], _to['key']) = await did.create_and_store_my_did(_to['wallet'], '{}')
+
+    _to['did_info'] = json.dumps({'did': _to['did'], 'key': _to['key'], 'role': _to['role']}).encode('utf-8')
+    key_for_from = 'key_for_' + _from['name']
+    _to['authcrypted_did_info'] = await crypto.auth_crypt(_to['wallet'], _to[key_for_from], _to['key_of_from_for_to'], _to['did_info'])
+
+    _from['authcrypted_did_info'] = _to['authcrypted_did_info']
+
+
+async def from___decrypt_did_and_key_and_role__verify_key__post_did_and_key_and_role_to_leger(_from, _to):
+    key_for_to = 'key_for_' + _to['name']
+    (sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info) = await auth_decrypt(_from['wallet'], _from[key_for_to], _from['authcrypted_did_info'])
+
+    assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], _from['connection_response']['did'])
+
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['key'], authdecrypted_did_info['role'])
+
+
+async def get_pseudonym(_from, _to):
+    await from___create_did_and_key__post_did_and_key_to_ledger__send_did_and_nonce_to_to(_from, _to)
+    await to___create_wallet__create_did_and_key__encrypt_did_and_key_and_nonce__send_did_and_key_and_nonce_to_from(_to, _from)
+    await from___decrypt_did_and_key_and_nonce__verify_nonce__post_did_and_key_to_ledger(_from, _to)
 
 
 async def get_verinym(_from, _to):
-    name = _to['name']
-    from_to_key = _from['key_for_' + name]
-    to_from_did = _to['did_for_gov']
-    to_from_key = _to['key_for_gov']
-
-    (to_did, to_key) = await did.create_and_store_my_did(_to['wallet'], '{}')
-    _to['did_info'] = json.dumps({'did': to_did, 'verkey': to_key})
-    _to['authcrypted_did_info'] = await crypto.auth_crypt(_to['wallet'], to_from_key, from_to_key, _to['did_info'].encode('utf-8'))
-    _from['authcrypted_did_info'] = _to['authcrypted_did_info']
-
-    (sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info) = await auth_decrypt(_from['wallet'], from_to_key, _from['authcrypted_did_info'])
-    assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], to_from_did)
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['verkey'], _to['role'])
-
-    return to_did
+    await to___create_did_and_key__encrypt_did_and_key_and_role__send_did_and_key_and_role_to_from(_to, _from)
+    await from___decrypt_did_and_key_and_role__verify_key__post_did_and_key_and_role_to_leger(_from, _to)
 
 
 async def prover_get_entities_from_ledger(pool_handle, _did, identifiers, timestamp_from=None, timestamp_to=None):
