@@ -2,10 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e5620b44-0662-4777-8c6b-af869e827eff" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/json/temp.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/demoDualIssuerX.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/demoSingleIssuer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/demoSingleIssuer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/demoDualIssuerX.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/demoDualIssuerX.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />

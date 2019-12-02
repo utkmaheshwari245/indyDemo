@@ -11,44 +11,48 @@ async def run():
     print('========================================')
     print('============== Start Demo ==============')
     print('========================================')
-    input('')
+
     (pool_, gov, sec, gs, jp, sig) = await system___set_up()
-    input('')
+
     await gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_sec(gov, sec)
     await gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs)
-    input('')
+
     await sec___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(sec, jp)
     await gs___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(gs, jp)
-    input('')
+
+    await sec___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(sec)
     await gs___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(gs)
-    input('')
+
     await sec___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(sec, sig)
     await gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(gs, sig)
-    input('')
+
     await sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_request__send_cred_request_to_sec(sig, sec)
     await sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_request__send_cred_request_to_gs(sig, gs)
-    input('')
+
     await sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(sec, sig)
-    await gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(gs, sig)
-    input('')
+    await gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(gs, sig)
+
+    await sec___post_revocation_registry_delta_to_ledger(sec)
+    await gs___post_revocation_registry_delta_to_ledger(gs)
+
     await sig___decrypt_cred_from_gs__store_cred_in_wallet(sig)
-    input('')
+
     await jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
-    input('')
+
     await sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
-    input('')
+
     await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, False)
-    # input('')
+
     # await gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
-    # input('')
+
     # await jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
-    # input('')
+
     # await sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
-    # input('')
+
     # await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
-    # input('')
+
     await system___tear_down(pool_, gov, sec, gs, jp, sig)
-    input('')
+
     print('========================================')
     print('=============== End Demo ===============')
     print('========================================')
@@ -120,8 +124,10 @@ async def system___set_up():
     }
     await get_pseudonym(gov, sig)
     await get_verinym(gov, sig)
+    sig['master_secret_id'] = await anoncreds.prover_create_master_secret(sig['wallet'], None)
 
     print('========================================')
+    input('')
 
     return (pool_, gov, sec, gs, jp, sig)
 
@@ -143,6 +149,7 @@ async def gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema
     sec['cred_schema_id'] = gov['sec_cred_schema_id']
 
     print('========================================')
+    input('')
 
 
 async def gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs):
@@ -162,6 +169,7 @@ async def gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema
     gs['cred_schema_id'] = gov['gs_cred_schema_id']
 
     print('========================================')
+    input('')
 
 
 async def sec___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(sec, jp):
@@ -172,7 +180,7 @@ async def sec___get_cred_schema_from_ledger__create_cred_definition__post_cred_d
     cred_def = {
         'tag': 'sec_tag',
         'type': 'CL',
-        'config': {'support_revocation': False}
+        'config': {'support_revocation': True}
     }
     (sec['cred_def_id'], sec['cred_def']) = await anoncreds.issuer_create_and_store_credential_def(sec['wallet'], sec['did'], sec['cred_schema'], cred_def['tag'],
                                                                                                    cred_def['type'], json.dumps(cred_def['config']))
@@ -183,7 +191,8 @@ async def sec___get_cred_schema_from_ledger__create_cred_definition__post_cred_d
     print('sec -> Send KYC Credential Definition Id to JP Morgan')
     jp['sec_cred_def_id'] = sec['cred_def_id']
 
-    print('----------------------------------------')
+    print('========================================')
+    input('')
 
 
 async def gs___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(gs, jp):
@@ -205,12 +214,30 @@ async def gs___get_cred_schema_from_ledger__create_cred_definition__post_cred_de
     print('Goldman Sachs -> Send KYC Credential Definition Id to JP Morgan')
     jp['gs_cred_def_id'] = gs['cred_def_id']
 
-    print('----------------------------------------')
+    print('========================================')
+    input('')
+
+
+async def sec___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(sec):
+    print('sec -> Create Revocation Registry')
+    sec['tails_config'] = json.dumps({'base_dir': '/tmp/indy_sec_tails', 'uri_pattern': ''})
+    tails_config_writer = await blob_storage.open_writer('default', sec['tails_config'])
+    (sec['cred_revoc_reg_id'], sec['cred_revoc_reg_def'], sec['cred_revoc_reg_entry']) = await anoncreds.issuer_create_and_store_revoc_reg(sec['wallet'], sec['did'], 'CL_ACCUM', 'sec_tag',
+                                                                                                                                           sec['cred_def_id'], '{}', tails_config_writer)
+
+    print('sec -> Post Revocation Registry Definition to Ledger')
+    await send_revoc_reg_def(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_def'])
+
+    print('sec -> Post Revocation Registry Entry to Ledger')
+    await send_revoc_reg_entry_or_delta(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_id'], sec['cred_revoc_reg_entry'])
+
+    print('========================================')
+    input('')
 
 
 async def gs___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(gs):
     print('Goldman Sachs -> Create Revocation Registry')
-    gs['tails_config'] = json.dumps({'base_dir': '/tmp/indy_acme_tails', 'uri_pattern': ''})
+    gs['tails_config'] = json.dumps({'base_dir': '/tmp/indy_gs_tails', 'uri_pattern': ''})
     tails_config_writer = await blob_storage.open_writer('default', gs['tails_config'])
     (gs['cred_revoc_reg_id'], gs['cred_revoc_reg_def'], gs['cred_revoc_reg_entry']) = await anoncreds.issuer_create_and_store_revoc_reg(gs['wallet'], gs['did'], 'CL_ACCUM', 'gs_tag',
                                                                                                                                         gs['cred_def_id'], '{}', tails_config_writer)
@@ -221,7 +248,8 @@ async def gs___create_revocation_registry__post_revocation_registry_definition_t
     print('Goldman Sachs -> Post Revocation Registry Entry to Ledger')
     await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_revoc_reg_entry'])
 
-    print('----------------------------------------')
+    print('========================================')
+    input('')
 
 
 async def sec___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(sec, sig):
@@ -239,6 +267,7 @@ async def sec___establish_connection_with_sig__create_cred_offer__encrypt_cred_o
     sig['sec_authcrypted_cred_offer'] = sec['authcrypted_cred_offer']
 
     print('========================================')
+    input('')
 
 
 async def gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(gs, sig):
@@ -256,6 +285,7 @@ async def gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_of
     sig['gs_authcrypted_cred_offer'] = gs['authcrypted_cred_offer']
 
     print('========================================')
+    input('')
 
 
 async def sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_request__send_cred_request_to_sec(sig, sec):
@@ -264,7 +294,6 @@ async def sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_r
     sig['sec_cred_def_id'] = authdecrypted_cred_offer['cred_def_id']
 
     print('Two Sigma -> Create KYC Credential Request')
-    sig['master_secret_id'] = await anoncreds.prover_create_master_secret(sig['wallet'], None)
     (sig['sec_cred_def_id'], sig['sec_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['sec_cred_def_id'])
     (sig['sec_cred_request'], sig['sec_cred_request_metadata']) = await anoncreds.prover_create_credential_req(sig['wallet'], sig['did'], sig['sec_cred_offer'],
                                                                                                                sig['sec_cred_def'], sig['master_secret_id'])
@@ -272,10 +301,11 @@ async def sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_r
     print('Two Sigma -> Encrypt KYC Credential Request')
     sig['sec_authcrypted_cred_request'] = await crypto.auth_crypt(sig['wallet'], sig['key_for_sec'], sig['sec_key_for_sig'], sig['sec_cred_request'].encode('utf-8'))
 
-    print('Two Sigma -> Send encrypted KYC Credential Request to Goldman Sachs')
+    print('Two Sigma -> Send encrypted KYC Credential Request to sec')
     sec['authcrypted_cred_request'] = sig['sec_authcrypted_cred_request']
 
     print('========================================')
+    input('')
 
 
 async def sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_request__send_cred_request_to_gs(sig, gs):
@@ -283,8 +313,7 @@ async def sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_re
     (sig['gs_key_for_sig'], sig['gs_cred_offer'], authdecrypted_cred_offer) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['gs_authcrypted_cred_offer'])
     sig['gs_cred_def_id'] = authdecrypted_cred_offer['cred_def_id']
 
-    # print('Two Sigma -> Create KYC Credential Request')
-    # sig['master_secret_id'] = await anoncreds.prover_create_master_secret(sig['wallet'], None)
+    print('Two Sigma -> Create KYC Credential Request')
     (sig['gs_cred_def_id'], sig['gs_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['gs_cred_def_id'])
     (sig['gs_cred_request'], sig['gs_cred_request_metadata']) = await anoncreds.prover_create_credential_req(sig['wallet'], sig['did'], sig['gs_cred_offer'],
                                                                                                              sig['gs_cred_def'], sig['master_secret_id'])
@@ -296,6 +325,7 @@ async def sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_re
     gs['authcrypted_cred_request'] = sig['gs_authcrypted_cred_request']
 
     print('========================================')
+    input('')
 
 
 async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(sec, sig):
@@ -308,7 +338,9 @@ async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_c
         'primarySicCode': {'raw': '1102', 'encoded': '1102'},
         'address': {'raw': '207A, Mulberry Woods, New York', 'encoded': '20212223242526272829'}
     })
-    (sec['cred'], _, _) = await anoncreds.issuer_create_credential(sec['wallet'], sec['cred_offer'], sec['cred_request'], sec['sig_cred_values'], None, None)
+    tails_config_reader = await blob_storage.open_reader('default', sec['tails_config'])
+    (sec['cred'], sec['cred_rev_id'], sec['cred_rev_reg_delta']) = await anoncreds.issuer_create_credential(sec['wallet'], sec['cred_offer'], sec['cred_request'], sec['sig_cred_values'],
+                                                                                                            sec['cred_revoc_reg_id'], tails_config_reader)
 
     print('sec -> Encrypt KYC Credential')
     sec['authcrypted_cred'] = await crypto.auth_crypt(sec['wallet'], sec['key_for_sig'], sec['sig_key_for_sec'], sec['cred'].encode('utf-8'))
@@ -317,9 +349,10 @@ async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_c
     sig['sec_authcrypted_cred'] = sec['authcrypted_cred']
 
     print('========================================')
+    input('')
 
 
-async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(gs, sig):
+async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(gs, sig):
     print('Goldman Sachs -> Decrypt KYC Credential Request from Two Sigma')
     (gs['sig_key_for_gs'], gs['cred_request'], _) = await auth_decrypt(gs['wallet'], gs['key_for_sig'], gs['authcrypted_cred_request'])
 
@@ -328,9 +361,9 @@ async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cr
         'liquidity': {'raw': '2.8', 'encoded': '2.8'},
         'rating': {'raw': '4', 'encoded': '4'}
     })
-    gs['tails_config_reader'] = await blob_storage.open_reader('default', gs['tails_config'])
+    tails_config_reader = await blob_storage.open_reader('default', gs['tails_config'])
     (gs['cred'], gs['cred_rev_id'], gs['cred_rev_reg_delta']) = await anoncreds.issuer_create_credential(gs['wallet'], gs['cred_offer'], gs['cred_request'], gs['sig_cred_values'],
-                                                                                                         gs['cred_revoc_reg_id'], gs['tails_config_reader'])
+                                                                                                         gs['cred_revoc_reg_id'], tails_config_reader)
 
     print('Goldman Sachs -> Encrypt KYC Credential')
     gs['authcrypted_cred'] = await crypto.auth_crypt(gs['wallet'], gs['key_for_sig'], gs['sig_key_for_gs'], gs['cred'].encode('utf-8'))
@@ -338,10 +371,18 @@ async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cr
     print('Goldman Sachs -> Send encrypted KYC Credential to Two Sigma')
     sig['gs_authcrypted_cred'] = gs['authcrypted_cred']
 
+    print('========================================')
+    input('')
+
+
+async def sec___post_revocation_registry_delta_to_ledger(sec):
+    print('sec -> Post Revocation Registry Delta to Ledger')
+    await send_revoc_reg_entry_or_delta(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_id'], sec['cred_rev_reg_delta'])
+
+
+async def gs___post_revocation_registry_delta_to_ledger(gs):
     print('Goldman Sachs -> Post Revocation Registry Delta to Ledger')
     await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_rev_reg_delta'])
-
-    print('========================================')
 
 
 async def sig___decrypt_cred_from_gs__store_cred_in_wallet(sig):
@@ -350,17 +391,19 @@ async def sig___decrypt_cred_from_gs__store_cred_in_wallet(sig):
 
     print('Two Sigma -> Store KYC Credential in Wallet')
     (_, sig['sec_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['sec_cred_def_id'])
-    await anoncreds.prover_store_credential(sig['wallet'], None, sig['sec_cred_request_metadata'], sig['sec_cred'], sig['sec_cred_def'], None)
+    (_, sig['sec_revoc_reg_def_json']) = await get_revoc_reg_def(sig['pool'], sig['did'], sec_cred['rev_reg_id'])
+    await anoncreds.prover_store_credential(sig['wallet'], None, sig['sec_cred_request_metadata'], sig['sec_cred'], sig['sec_cred_def'], sig['sec_revoc_reg_def_json'])
 
     print('Two Sigma -> Decrypt KYC Credential from Goldman Sachs')
     (_, sig['gs_cred'], gs_cred) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['gs_authcrypted_cred'])
 
     print('Two Sigma -> Store KYC Credential in Wallet')
     (_, sig['gs_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['gs_cred_def_id'])
-    (_, sig['revoc_reg_def_json']) = await get_revoc_reg_def(sig['pool'], sig['did'], gs_cred['rev_reg_id'])
-    await anoncreds.prover_store_credential(sig['wallet'], None, sig['gs_cred_request_metadata'], sig['gs_cred'], sig['gs_cred_def'], sig['revoc_reg_def_json'])
+    (_, sig['gs_revoc_reg_def_json']) = await get_revoc_reg_def(sig['pool'], sig['did'], gs_cred['rev_reg_id'])
+    await anoncreds.prover_store_credential(sig['wallet'], None, sig['gs_cred_request_metadata'], sig['gs_cred'], sig['gs_cred_def'], sig['gs_revoc_reg_def_json'])
 
     print('========================================')
+    input('')
 
 
 async def jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig):
@@ -410,6 +453,7 @@ async def jp___establish_connection_with_sig__create_cred_proof_request__encrypt
     sig['authcrypted_cred_proof_request'] = jp['authcrypted_cred_proof_request']
 
     print('========================================')
+    input('')
 
 
 async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp):
@@ -457,6 +501,7 @@ async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_c
     jp['authcrypted_cred_proof'] = sig['authcrypted_cred_proof']
 
     print('========================================')
+    input('')
 
 
 async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, revoked):
@@ -486,6 +531,7 @@ async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, revoked):
         assert '2.8' == cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
 
     print('========================================')
+    input('')
 
 
 async def gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs):
@@ -496,6 +542,7 @@ async def gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
     await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_rev_reg_delta'])
 
     print('========================================')
+    input('')
 
 
 async def system___tear_down(pool_, gov, sec, gs, jp, sig):
@@ -522,6 +569,9 @@ async def system___tear_down(pool_, gov, sec, gs, jp, sig):
     print('Close and Delete Two Sigma\'s Wallet')
     await wallet.close_wallet(sig['wallet'])
     await wallet.delete_wallet(sig['wallet_config'], sig['wallet_credentials'])
+
+    print('========================================')
+    input('')
 
 
 async def from___create_did_and_key__post_did_and_key_to_ledger__send_did_and_nonce_to_to(_from, _to):
