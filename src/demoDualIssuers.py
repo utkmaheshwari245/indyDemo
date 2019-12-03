@@ -2,55 +2,85 @@ import asyncio
 import time
 import json
 
-from indy import anoncreds, crypto, did, ledger, pool, wallet
 
-tab = "    "
+from indy import anoncreds, crypto, did, ledger, pool, wallet, blob_storage
+from os.path import dirname
+
 
 async def run():
+    print('----------------------------------------')
+    print('-------------- start demo --------------')
+    print('----------------------------------------')
+    print('')
 
-    print("========================================")
-    print("================ Set Up ================")
-    print("========================================")
+    (pool_, gov, sec, gs, jp, sig) = await system___set_up()
 
-    print("Initialize Pool")
-    await pool.set_protocol_version(2) # Set protocol version 2 to work with Indy Node 1.4
+    await gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_sec(gov, sec)
+    await gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs)
+
+    await sec___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(sec, jp)
+    await gs___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(gs, jp)
+
+    await sec___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(sec)
+    await gs___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(gs)
+
+    await sec___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(sec, sig)
+    await gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(gs, sig)
+
+    await sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_request__send_cred_request_to_sec(sig, sec)
+    await sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_request__send_cred_request_to_gs(sig, gs)
+
+    await sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(sec, sig)
+    await gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(gs, sig)
+
+    await sig___decrypt_cred_from_gs__store_cred_in_wallet(sig)
+
+    await jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
+
+    await sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
+
+    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, False)
+
+    await gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
+
+    await jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
+
+    await sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
+
+    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
+
+    await system___tear_down(pool_, gov, sec, gs, jp, sig)
+
+    print('----------------------------------------')
+    print('--------------- end demo ---------------')
+    print('----------------------------------------')
+
+
+async def system___set_up():
+    print('initialize pool (blockchain ledger)')
+    await pool.set_protocol_version(2)
     pool_ = {
         'name': 'pool1',
-        'config': json.dumps({"genesis_txn": '/home/indy/sandbox/pool_transactions_genesis'})
+        # 'config': json.dumps({'genesis_txn': '/var/lib/indy/sandbox/pool_transactions_genesis'})
+        'config': json.dumps({'genesis_txn': '/home/indy/sandbox/pool_transactions_genesis'})
     }
-
-    print(tab + 'System -> Create pool with ledger config')
-    try:
-        await pool.create_pool_ledger_config(pool_['name'], pool_['config'])
-    except IndyError as ex:
-        if ex.error_code == ErrorCode.PoolLedgerConfigAlreadyExistsError:
-            pass
-
-    print(tab + 'System -> Open pool')
+    await pool.create_pool_ledger_config(pool_['name'], pool_['config'])
     pool_['handle'] = await pool.open_pool_ledger(pool_['name'], None)
 
-    print("Initialize Government")
-    government = {
-        'name': "government",
-        'wallet_config': json.dumps({'id': 'government_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'government_wallet_key'}),
+    print('initialize gov (kyc credential schema creater)')
+    gov = {
+        'name': 'gov',
+        'wallet_config': json.dumps({'id': 'gov_wallet'}),
+        'wallet_credentials': json.dumps({'key': 'gov_wallet_key'}),
         'pool': pool_['handle'],
         'seed': '000000000000000000000000Steward1'
     }
+    await wallet.create_wallet(gov['wallet_config'], gov['wallet_credentials'])
+    gov['wallet'] = await wallet.open_wallet(gov['wallet_config'], gov['wallet_credentials'])
+    gov['did_info'] = json.dumps({'seed': gov['seed']})
+    (gov['did'], gov['key']) = await did.create_and_store_my_did(gov['wallet'], gov['did_info'])
 
-    print(tab + 'Government -> Create wallet')
-    try:
-        await wallet.create_wallet(government['wallet_config'], government['wallet_credentials'])
-    except IndyError as ex:
-        if ex.error_code == ErrorCode.WalletAlreadyExistsError:
-            pass
-    government['wallet'] = await wallet.open_wallet(government['wallet_config'], government['wallet_credentials'])
-
-    print(tab + 'Government -> Create did and key and store in wallet')
-    government['did_info'] = json.dumps({'seed': government['seed']})
-    (government['did'], government['key']) = await did.create_and_store_my_did(government['wallet'], government['did_info'])
-
-    print('Initialize SEC')
+    print('initialize sec (kyc credential issuer)')
     sec = {
         'name': 'sec',
         'wallet_config': json.dumps({'id': 'sec_wallet'}),
@@ -58,748 +88,608 @@ async def run():
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    await get_pseudonym(gov, sec)
+    await get_verinym(gov, sec)
 
-    (government['did_for_sec'],
-     government['key_for_sec'],
-     sec['did_for_government'],
-     sec['key_for_government'], _) = await onboarding(government, sec)
-
-    sec['did'] = await get_verinym(government, sec)
-
-    print('Initialize General Auditor')
-    general_auditor = {
-        'name': 'general_auditor',
-        'wallet_config': json.dumps({'id': 'general_auditor_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'general_auditor_wallet_key'}),
+    print('initialize gs (kyc credential issuer)')
+    gs = {
+        'name': 'gs',
+        'wallet_config': json.dumps({'id': 'gs_wallet'}),
+        'wallet_credentials': json.dumps({'key': 'gs_wallet_key'}),
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    await get_pseudonym(gov, gs)
+    await get_verinym(gov, gs)
 
-    (government['did_for_general_auditor'],
-     government['key_for_general_auditor'],
-     general_auditor['did_for_government'],
-     general_auditor['key_for_government'], _) = await onboarding(government, general_auditor)
-
-    general_auditor['did'] = await get_verinym(government, general_auditor)
-
-    print('Initialize Financial Auditor')
-    financial_auditor = {
-        'name': 'financial_auditor',
-        'wallet_config': json.dumps({'id': 'financial_auditor_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'financial_auditor_wallet_key'}),
+    print('initialize jp (kyc credential verifier)')
+    jp = {
+        'name': 'jp',
+        'wallet_config': json.dumps({'id': 'jp_wallet'}),
+        'wallet_credentials': json.dumps({'key': 'jp_wallet_key'}),
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    await get_pseudonym(gov, jp)
+    await get_verinym(gov, jp)
 
-    (government['did_for_financial_auditor'],
-     government['key_for_financial_auditor'],
-     financial_auditor['did_for_government'],
-     financial_auditor['key_for_government'], _) = await onboarding(government, financial_auditor)
-
-    financial_auditor['did'] = await get_verinym(government, financial_auditor)
-
-    print('Initialize Goldman Sachs')
-    goldman_sachs = {
-        'name': 'goldman_sachs',
-        'wallet_config': json.dumps({'id': 'goldman_sachs_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'goldman_sachs_wallet_key'}),
+    print('initialize sig (kyc credential owner)')
+    sig = {
+        'name': 'sig',
+        'wallet_config': json.dumps({'id': 'sig_wallet'}),
+        'wallet_credentials': json.dumps({'key': 'sig_wallet_key'}),
         'pool': pool_['handle'],
         'role': 'TRUST_ANCHOR'
     }
+    await get_pseudonym(gov, sig)
+    await get_verinym(gov, sig)
+    sig['master_secret_id'] = await anoncreds.prover_create_master_secret(sig['wallet'], None)
 
-    (government['did_for_goldman_sachs'],
-     government['key_for_goldman_sachs'],
-     goldman_sachs['did_for_government'],
-     goldman_sachs['key_for_government'], _) = await onboarding(government, goldman_sachs)
+    print('----------------------------------------')
+    input('')
 
-    goldman_sachs['did'] = await get_verinym(government, goldman_sachs)
+    return (pool_, gov, sec, gs, jp, sig)
 
-    print()
-    print("========================================")
-    print("============== Start Demo ==============")
-    print("========================================")
 
-    print("SEC -> Create General KYC Credential Schema")
-    general_kyc = {
-        'name': 'General KYC',
-        'version': '1.2',
-        'attributes': ['id', 'legalName', 'legalOwner', 'primarySicCode', 'address']
+async def gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_sec(gov, sec):
+    print('gov | create kyc credential schema: {legalName, primarySicCode, address}')
+    cred_schema = {
+        'name': 'sec_kyc',
+        'version': '1.0',
+        'attributes': ['legalName', 'primarySicCode', 'address']
     }
-    (sec['general_kyc_schema_id'], sec['general_kyc_schema']) = await anoncreds.issuer_create_schema(sec['did'],
-                                                                                                     general_kyc['name'],
-                                                                                                     general_kyc['version'],
-                                                                                                     json.dumps(general_kyc['attributes']))
-    general_kyc_schema_id = sec['general_kyc_schema_id']
+    (gov['sec_cred_schema_id'], gov['sec_cred_schema']) = await anoncreds.issuer_create_schema(gov['did'], cred_schema['name'], cred_schema['version'],
+                                                                                               json.dumps(cred_schema['attributes']))
 
-    print("SEC -> Send General KYC Credential Schema to Ledger")
-    await send_schema(sec['pool'], sec['wallet'], sec['did'], sec['general_kyc_schema'])
+    print('gov | post kyc credential schema to ledger')
+    await send_schema(gov['pool'], gov['wallet'], gov['did'], gov['sec_cred_schema'])
 
-    print("SEC -> Create Financial KYC Credential Schema")
-    financial_kyc = {
-        'name': 'Financial KYC',
-        'version': '1.2',
-        'attributes': ['taxCountry', 'industryClassificationCode', 'liquidity', 'exposureCap', 'creditRating']
+    print('gov | send kyc credential schema id to sec')
+    sec['cred_schema_id'] = gov['sec_cred_schema_id']
+
+    print('----------------------------------------')
+    input('')
+
+
+async def gov___create_cred_schema__post_cred_schema_to_ledger__send_cred_schema_id_to_gs(gov, gs):
+    print('gov | create kyc credential schema: {liquidity, rating}')
+    cred_schema = {
+        'name': 'gs_kyc',
+        'version': '1.0',
+        'attributes': ['liquidity', 'rating']
     }
-    (sec['financial_kyc_schema_id'], sec['financial_kyc_schema']) = await anoncreds.issuer_create_schema(sec['did'],
-                                                                                                         financial_kyc['name'],
-                                                                                                         financial_kyc['version'],
-                                                                                                         json.dumps(financial_kyc['attributes']))
-    financial_kyc_schema_id = sec['financial_kyc_schema_id']
+    (gov['gs_cred_schema_id'], gov['gs_cred_schema']) = await anoncreds.issuer_create_schema(gov['did'], cred_schema['name'], cred_schema['version'],
+                                                                                             json.dumps(cred_schema['attributes']))
 
-    print("SEC -> Send Financial KYC Credential Schema to Ledger")
-    await send_schema(sec['pool'], sec['wallet'], sec['did'], sec['financial_kyc_schema'])
+    print('gov | post kyc credential schema to ledger')
+    await send_schema(gov['pool'], gov['wallet'], gov['did'], gov['gs_cred_schema'])
 
-    time.sleep(1) # sleep 1 second before getting schema
+    print('gov | send kyc credential schema id to gs')
+    gs['cred_schema_id'] = gov['gs_cred_schema_id']
 
-    print("========================================")
+    print('----------------------------------------')
+    input('')
 
-    print("General Auditor -> Get General KYC Schema from Ledger")
-    (general_auditor['general_kyc_schema_id'], general_auditor['general_kyc_schema']) = await get_schema(general_auditor['pool'],
-                                                                                                         general_auditor['did'],
-                                                                                                         general_kyc_schema_id)
 
-    print("General Auditor -> Create and Store General KYC Credential Definition in Wallet")
-    general_kyc_cred_def = {
-        'tag': 'TAG1',
+async def sec___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(sec, jp):
+    print('sec | get kyc schema from Ledger')
+    (_, sec['cred_schema']) = await get_schema(sec['pool'], sec['did'], sec['cred_schema_id'])
+
+    print('sec | create kyc credential definition')
+    cred_def = {
+        'tag': 'sec_tag',
         'type': 'CL',
-        'config': {"support_revocation": False}
+        'config': {'support_revocation': True}
     }
-    (general_auditor['general_kyc_cred_def_id'], general_auditor['general_kyc_cred_def']) = await anoncreds.issuer_create_and_store_credential_def(general_auditor['wallet'],
-                                                                                                                                                   general_auditor['did'],
-                                                                                                                                                   general_auditor['general_kyc_schema'],
-                                                                                                                                                   general_kyc_cred_def['tag'],
-                                                                                                                                                   general_kyc_cred_def['type'],
-                                                                                                                                                   json.dumps(general_kyc_cred_def['config']))
+    (sec['cred_def_id'], sec['cred_def']) = await anoncreds.issuer_create_and_store_credential_def(sec['wallet'], sec['did'], sec['cred_schema'], cred_def['tag'],
+                                                                                                   cred_def['type'], json.dumps(cred_def['config']))
 
-    print("General Auditor -> Send General KYC Credential Definition to Ledger")
-    await send_cred_def(general_auditor['pool'], general_auditor['wallet'], general_auditor['did'], general_auditor['general_kyc_cred_def'])
+    print('sec | post kyc credential definition to ledger')
+    await send_cred_def(sec['pool'], sec['wallet'], sec['did'], sec['cred_def'])
 
-    print("========================================")
+    print('sec | send kyc credential definition id to jp')
+    jp['sec_cred_def_id'] = sec['cred_def_id']
 
-    print("Financial Auditor -> Get Financial KYC Schema from Ledger")
-    (financial_auditor['financial_kyc_schema_id'], financial_auditor['financial_kyc_schema']) = await get_schema(financial_auditor['pool'],
-                                                                                                                 financial_auditor['did'],
-                                                                                                                 financial_kyc_schema_id)
+    print('----------------------------------------')
+    input('')
 
-    print("Financial Auditor -> Create and Store Financial KYC Credential Definition in Wallet")
-    financial_kyc_cred_def = {
-        'tag': 'TAG1',
+
+async def gs___get_cred_schema_from_ledger__create_cred_definition__post_cred_definition_to_ledger__send_cred_definition_id_to_jp(gs, jp):
+    print('gs | get kyc schema from ledger')
+    (_, gs['cred_schema']) = await get_schema(gs['pool'], gs['did'], gs['cred_schema_id'])
+
+    print('gs | create kyc credential definition')
+    cred_def = {
+        'tag': 'gs_tag',
         'type': 'CL',
-        'config': {"support_revocation": False}
+        'config': {'support_revocation': True}
     }
-    (financial_auditor['financial_kyc_cred_def_id'], financial_auditor['financial_kyc_cred_def']) = await anoncreds.issuer_create_and_store_credential_def(financial_auditor['wallet'],
-                                                                                                                                                           financial_auditor['did'],
-                                                                                                                                                           financial_auditor['financial_kyc_schema'],
-                                                                                                                                                           financial_kyc_cred_def['tag'],
-                                                                                                                                                           financial_kyc_cred_def['type'],
-                                                                                                                                                           json.dumps(financial_kyc_cred_def['config']))
+    (gs['cred_def_id'], gs['cred_def']) = await anoncreds.issuer_create_and_store_credential_def(gs['wallet'], gs['did'], gs['cred_schema'], cred_def['tag'],
+                                                                                                 cred_def['type'], json.dumps(cred_def['config']))
 
-    print("Financial Auditor -> Send Financial KYC Credential Definition to Ledger")
-    await send_cred_def(financial_auditor['pool'], financial_auditor['wallet'], financial_auditor['did'], financial_auditor['financial_kyc_cred_def'])
+    print('gs | post kyc credential definition to ledger')
+    await send_cred_def(gs['pool'], gs['wallet'], gs['did'], gs['cred_def'])
 
-    print("========================================")
+    print('gs | send kyc credential definition id to jp')
+    jp['gs_cred_def_id'] = gs['cred_def_id']
 
-    jp_morgan = {
-        'name': 'jp_morgan',
-        'wallet_config': json.dumps({'id': 'jp_morgan_wallet'}),
-        'wallet_credentials': json.dumps({'key': 'jp_morgan_wallet_key'}),
-        'pool': pool_['handle'],
-    }
-    print("General Auditor -> Establish p2p connection with JP Morgan")
-    (general_auditor['did_for_jp_morgan'],
-     general_auditor['key_for_jp_morgan'],
-     jp_morgan['did_for_general_auditor'],
-     jp_morgan['key_for_general_auditor'],
-     general_auditor['jp_morgan_connection_response']) = await onboarding(general_auditor, jp_morgan)
+    print('----------------------------------------')
+    input('')
 
-    print("General Auditor -> Create General KYC Credential Offer for JP Morgan")
-    general_auditor['general_kyc_cred_offer'] = await anoncreds.issuer_create_credential_offer(general_auditor['wallet'], general_auditor['general_kyc_cred_def_id'])
 
-    print("General Auditor -> Encrypt General KYC Credential Offer with JP Morgan\'s key")
-    general_auditor['jp_morgan_key_for_general_auditor'] = await did.key_for_did(general_auditor['pool'],
-                                                                                 general_auditor['wallet'],
-                                                                                 general_auditor['jp_morgan_connection_response']['did'])
-    general_auditor['authcrypted_general_kyc_cred_offer'] = await crypto.auth_crypt(general_auditor['wallet'],
-                                                                                    general_auditor['key_for_jp_morgan'],
-                                                                                    general_auditor['jp_morgan_key_for_general_auditor'],
-                                                                                    general_auditor['general_kyc_cred_offer'].encode('utf-8'))
+async def sec___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(sec):
+    print('sec | create revocation registry')
+    sec['tails_config'] = json.dumps({'base_dir': '/tmp/indy_sec_tails', 'uri_pattern': ''})
+    tails_config_writer = await blob_storage.open_writer('default', sec['tails_config'])
+    (sec['cred_revoc_reg_id'], sec['cred_revoc_reg_def'], sec['cred_revoc_reg_entry']) = await anoncreds.issuer_create_and_store_revoc_reg(sec['wallet'], sec['did'], 'CL_ACCUM', 'sec_tag',
+                                                                                                                                           sec['cred_def_id'], '{}', tails_config_writer)
 
-    print("General Auditor -> Send Encrypted General KYC Credential Offer to JP Morgan")
-    jp_morgan['authcrypted_general_kyc_cred_offer'] = general_auditor['authcrypted_general_kyc_cred_offer']
+    print('sec | post revocation registry definition to ledger')
+    await send_revoc_reg_def(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_def'])
 
-    print("========================================")
+    print('sec | post revocation registry entry to ledger')
+    await send_revoc_reg_entry_or_delta(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_id'], sec['cred_revoc_reg_entry'])
 
-    print("Financial Auditor -> Establish p2p connection with JP Morgan")
-    (financial_auditor['did_for_jp_morgan'],
-     financial_auditor['key_for_jp_morgan'],
-     jp_morgan['did_for_financial_auditor'],
-     jp_morgan['key_for_financial_auditor'],
-     financial_auditor['jp_morgan_connection_response']) = await onboarding(financial_auditor, jp_morgan)
+    print('----------------------------------------')
+    input('')
 
-    print("Financial Auditor -> Create Financial KYC Credential Offer for JP Morgan")
-    financial_auditor['financial_kyc_cred_offer'] = await anoncreds.issuer_create_credential_offer(financial_auditor['wallet'], financial_auditor['financial_kyc_cred_def_id'])
 
-    print("Financial Auditor -> Encrypt Financial KYC Credential Offer with JP Morgan\'s key")
-    financial_auditor['jp_morgan_key_for_financial_auditor'] = await did.key_for_did(financial_auditor['pool'],
-                                                                                     financial_auditor['wallet'],
-                                                                                     financial_auditor['jp_morgan_connection_response']['did'])
-    financial_auditor['authcrypted_financial_kyc_cred_offer'] = await crypto.auth_crypt(financial_auditor['wallet'],
-                                                                                        financial_auditor['key_for_jp_morgan'],
-                                                                                        financial_auditor['jp_morgan_key_for_financial_auditor'],
-                                                                                        financial_auditor['financial_kyc_cred_offer'].encode('utf-8'))
+async def gs___create_revocation_registry__post_revocation_registry_definition_to_ledger__post_revocation_registry_entry_to_ledger(gs):
+    print('gs | create revocation registry')
+    gs['tails_config'] = json.dumps({'base_dir': '/tmp/indy_gs_tails', 'uri_pattern': ''})
+    tails_config_writer = await blob_storage.open_writer('default', gs['tails_config'])
+    (gs['cred_revoc_reg_id'], gs['cred_revoc_reg_def'], gs['cred_revoc_reg_entry']) = await anoncreds.issuer_create_and_store_revoc_reg(gs['wallet'], gs['did'], 'CL_ACCUM', 'gs_tag',
+                                                                                                                                        gs['cred_def_id'], '{}', tails_config_writer)
 
-    print("Financial Auditor -> Send Encrypted Financial KYC Credential Offer to JP Morgan")
-    jp_morgan['authcrypted_financial_kyc_cred_offer'] = financial_auditor['authcrypted_financial_kyc_cred_offer']
+    print('gs | post revocation registry definition to ledger')
+    await send_revoc_reg_def(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_def'])
 
-    print("========================================")
+    print('gs | post revocation registry entry to ledger')
+    await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_revoc_reg_entry'])
 
-    print("JP Morgan -> Create and Store Master Secret in Wallet")
-    jp_morgan['master_secret_id'] = await anoncreds.prover_create_master_secret(jp_morgan['wallet'], None)
+    print('----------------------------------------')
+    input('')
 
-    print("JP Morgan -> Decrypt General KYC Credential Offer from General Auditor")
-    (jp_morgan['general_auditor_key_for_jp_morgan'], jp_morgan['general_kyc_cred_offer'], authdecrypted_general_kyc_cred_offer) = await auth_decrypt(jp_morgan['wallet'],
-                                                                                                                                                     jp_morgan['key_for_general_auditor'],
-                                                                                                                                                     jp_morgan['authcrypted_general_kyc_cred_offer'])
-    jp_morgan['general_kyc_schema_id'] = authdecrypted_general_kyc_cred_offer['schema_id']
-    jp_morgan['general_kyc_cred_def_id'] = authdecrypted_general_kyc_cred_offer['cred_def_id']
 
-    print("JP Morgan -> Get General KYC Credential Definition from Ledger")
-    (jp_morgan['general_auditor_general_kyc_cred_def_id'], jp_morgan['general_auditor_general_kyc_cred_def']) = await get_cred_def(jp_morgan['pool'],
-                                                                                                                                   jp_morgan['did_for_general_auditor'],
-                                                                                                                                   authdecrypted_general_kyc_cred_offer['cred_def_id'])
+async def sec___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(sec, sig):
+    await get_pseudonym(sec, sig)
 
-    print("JP Morgan -> Create General KYC Credential Request for General Auditor")
-    (jp_morgan['general_kyc_cred_request'], jp_morgan['general_kyc_cred_request_metadata']) = await anoncreds.prover_create_credential_req(jp_morgan['wallet'],
-                                                                                                                                           jp_morgan['did_for_general_auditor'],
-                                                                                                                                           jp_morgan['general_kyc_cred_offer'],
-                                                                                                                                           jp_morgan['general_auditor_general_kyc_cred_def'],
-                                                                                                                                           jp_morgan['master_secret_id'])
+    print('sec | create kyc credential offer for sig')
+    sec['cred_offer'] = await anoncreds.issuer_create_credential_offer(sec['wallet'], sec['cred_def_id'])
 
-    print("JP Morgan -> Encrypt General KYC Credential Request with General Auditor\'s key")
-    jp_morgan['authcrypted_general_kyc_cred_request'] = await crypto.auth_crypt(jp_morgan['wallet'],
-                                                                                jp_morgan['key_for_general_auditor'],
-                                                                                jp_morgan['general_auditor_key_for_jp_morgan'],
-                                                                                jp_morgan['general_kyc_cred_request'].encode('utf-8'))
+    print('sec | encrypt kyc credential offer')
+    sec['sig_key_for_sec'] = await did.key_for_did(sec['pool'], sec['wallet'], sec['sig_connection_response']['did'])
+    sec['authcrypted_cred_offer'] = await crypto.auth_crypt(sec['wallet'], sec['key_for_sig'], sec['sig_key_for_sec'], sec['cred_offer'].encode('utf-8'))
 
-    print("JP Morgan -> Send encrypted General KYC Credential Request to General Auditor")
-    general_auditor['authcrypted_general_kyc_cred_request'] = jp_morgan['authcrypted_general_kyc_cred_request']
+    print('sec | send encrypted kyc credential offer to sig')
+    sig['sec_authcrypted_cred_offer'] = sec['authcrypted_cred_offer']
 
-    print("JP Morgan -> Decrypt Financial KYC Credential Offer from Financial Auditor")
-    (jp_morgan['financial_auditor_key_for_jp_morgan'], jp_morgan['financial_kyc_cred_offer'], authdecrypted_financial_kyc_cred_offer) = await auth_decrypt(jp_morgan['wallet'],
-                                                                                                                                                           jp_morgan['key_for_financial_auditor'],
-                                                                                                                                                           jp_morgan['authcrypted_financial_kyc_cred_offer'])
-    jp_morgan['financial_kyc_schema_id'] = authdecrypted_financial_kyc_cred_offer['schema_id']
-    jp_morgan['financial_kyc_cred_def_id'] = authdecrypted_financial_kyc_cred_offer['cred_def_id']
+    print('----------------------------------------')
+    input('')
 
-    print("JP Morgan -> Get Financial KYC Credential Definition from Ledger")
-    (jp_morgan['financial_auditor_financial_kyc_cred_def_id'], jp_morgan['financial_auditor_financial_kyc_cred_def']) = await get_cred_def(jp_morgan['pool'],
-                                                                                                                                           jp_morgan['did_for_financial_auditor'],
-                                                                                                                                           authdecrypted_financial_kyc_cred_offer['cred_def_id'])
 
-    print("JP Morgan -> Create Financial KYC Credential Request for Financial Auditor")
-    (jp_morgan['financial_kyc_cred_request'], jp_morgan['financial_kyc_cred_request_metadata']) = await anoncreds.prover_create_credential_req(jp_morgan['wallet'],
-                                                                                                                                               jp_morgan['did_for_financial_auditor'],
-                                                                                                                                               jp_morgan['financial_kyc_cred_offer'],
-                                                                                                                                               jp_morgan['financial_auditor_financial_kyc_cred_def'],
-                                                                                                                                               jp_morgan['master_secret_id'])
+async def gs___establish_connection_with_sig__create_cred_offer__encrypt_cred_offer__send_cred_offer_to_sig(gs, sig):
+    await get_pseudonym(gs, sig)
 
-    print("JP Morgan -> Encrypt Financial KYC Credential Request with Financial Auditor\'s key")
-    jp_morgan['authcrypted_financial_kyc_cred_request'] = await crypto.auth_crypt(jp_morgan['wallet'],
-                                                                                  jp_morgan['key_for_financial_auditor'],
-                                                                                  jp_morgan['financial_auditor_key_for_jp_morgan'],
-                                                                                  jp_morgan['financial_kyc_cred_request'].encode('utf-8'))
+    print('gs | create kyc credential offer for sig')
+    gs['cred_offer'] = await anoncreds.issuer_create_credential_offer(gs['wallet'], gs['cred_def_id'])
 
-    print("JP Morgan -> Send encrypted Financial KYC Credential Request to Financial Auditor")
-    financial_auditor['authcrypted_financial_kyc_cred_request'] = jp_morgan['authcrypted_financial_kyc_cred_request']
+    print('gs | encrypt kyc credential offer')
+    gs['sig_key_for_gs'] = await did.key_for_did(gs['pool'], gs['wallet'], gs['sig_connection_response']['did'])
+    gs['authcrypted_cred_offer'] = await crypto.auth_crypt(gs['wallet'], gs['key_for_sig'], gs['sig_key_for_gs'], gs['cred_offer'].encode('utf-8'))
 
-    print("========================================")
+    print('gs | send encrypted kyc credential offer to sig')
+    sig['gs_authcrypted_cred_offer'] = gs['authcrypted_cred_offer']
 
-    print("General Auditor -> Decrypt General KYC Credential Request from JP Morgan")
-    (general_auditor['jp_morgan_key_for_general_auditor'], general_auditor['general_kyc_cred_request'], _) = await auth_decrypt(general_auditor['wallet'],
-                                                                                                                                general_auditor['key_for_jp_morgan'],
-                                                                                                                                general_auditor['authcrypted_general_kyc_cred_request'])
+    print('----------------------------------------')
+    input('')
 
-    print("General Auditor -> Create General KYC Credential for JP Morgan")
-    general_auditor['jp_morgan_general_kyc_cred_values'] = json.dumps({
-        "id": {"raw": "101", "encoded": "101"},
-        "legalName": {"raw": "JP Morgan Coop.", "encoded": "00010203040506070809"},
-        "legalOwner": {"raw": "Mr. Morgan", "encoded": "10111213141516171819"},
-        "primarySicCode": {"raw": "1102", "encoded": "1102"},
-        "address": {"raw": "207A, Mulberry Woods, New York", "encoded": "20212223242526272829"}
+
+async def sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_request__send_cred_request_to_sec(sig, sec):
+    print('sig | decrypt kyc credential offer from sec')
+    (sig['sec_key_for_sig'], sig['sec_cred_offer'], authdecrypted_cred_offer) = await auth_decrypt(sig['wallet'], sig['key_for_sec'], sig['sec_authcrypted_cred_offer'])
+    sig['sec_cred_def_id'] = authdecrypted_cred_offer['cred_def_id']
+
+    print('sig | create kyc credential request')
+    (sig['sec_cred_def_id'], sig['sec_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['sec_cred_def_id'])
+    (sig['sec_cred_request'], sig['sec_cred_request_metadata']) = await anoncreds.prover_create_credential_req(sig['wallet'], sig['did'], sig['sec_cred_offer'],
+                                                                                                               sig['sec_cred_def'], sig['master_secret_id'])
+
+    print('sig | encrypt kyc credential request')
+    sig['sec_authcrypted_cred_request'] = await crypto.auth_crypt(sig['wallet'], sig['key_for_sec'], sig['sec_key_for_sig'], sig['sec_cred_request'].encode('utf-8'))
+
+    print('sig | send encrypted kyc credential request to sec')
+    sec['authcrypted_cred_request'] = sig['sec_authcrypted_cred_request']
+
+    print('----------------------------------------')
+    input('')
+
+
+async def sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_request__send_cred_request_to_gs(sig, gs):
+    print('sig | decrypt kyc credential offer from gs')
+    (sig['gs_key_for_sig'], sig['gs_cred_offer'], authdecrypted_cred_offer) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['gs_authcrypted_cred_offer'])
+    sig['gs_cred_def_id'] = authdecrypted_cred_offer['cred_def_id']
+
+    print('sig | create kyc credential request')
+    (sig['gs_cred_def_id'], sig['gs_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['gs_cred_def_id'])
+    (sig['gs_cred_request'], sig['gs_cred_request_metadata']) = await anoncreds.prover_create_credential_req(sig['wallet'], sig['did'], sig['gs_cred_offer'],
+                                                                                                             sig['gs_cred_def'], sig['master_secret_id'])
+
+    print('sig | encrypt kyc credential request')
+    sig['gs_authcrypted_cred_request'] = await crypto.auth_crypt(sig['wallet'], sig['key_for_gs'], sig['gs_key_for_sig'], sig['gs_cred_request'].encode('utf-8'))
+
+    print('sig | send encrypted kyc credential request to gs')
+    gs['authcrypted_cred_request'] = sig['gs_authcrypted_cred_request']
+
+    print('----------------------------------------')
+    input('')
+
+
+async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(sec, sig):
+    print('sec | decrypt kyc credential request from sig')
+    (sec['sig_key_for_sec'], sec['cred_request'], _) = await auth_decrypt(sec['wallet'], sec['key_for_sig'], sec['authcrypted_cred_request'])
+
+    print('sec | create kyc credential : {legalName: Two Sigma Coop., primarySicCode: 1102, address: 207A, Mulberry Woods, New York}')
+    sec['sig_cred_values'] = json.dumps({
+        'legalName': {'raw': 'Two Sigma Coop.', 'encoded': '00010203040506070809'},
+        'primarySicCode': {'raw': '1102', 'encoded': '1102'},
+        'address': {'raw': '207A, Mulberry Woods, New York', 'encoded': '20212223242526272829'}
     })
-    (general_auditor['general_kyc_cred'], _, _) = await anoncreds.issuer_create_credential(general_auditor['wallet'],
-                                                                                           general_auditor['general_kyc_cred_offer'],
-                                                                                           general_auditor['general_kyc_cred_request'],
-                                                                                           general_auditor['jp_morgan_general_kyc_cred_values'],
-                                                                                           None,
-                                                                                           None)
+    tails_config_reader = await blob_storage.open_reader('default', sec['tails_config'])
+    (sec['cred'], sec['cred_rev_id'], sec['cred_rev_reg_delta']) = await anoncreds.issuer_create_credential(sec['wallet'], sec['cred_offer'], sec['cred_request'], sec['sig_cred_values'],
+                                                                                                            sec['cred_revoc_reg_id'], tails_config_reader)
 
-    print("General Auditor -> Encrypt General KYC Credential for JP Morgan")
-    general_auditor['authcrypted_general_kyc_cred'] = await crypto.auth_crypt(general_auditor['wallet'],
-                                                                              general_auditor['key_for_jp_morgan'],
-                                                                              general_auditor['jp_morgan_key_for_general_auditor'],
-                                                                              general_auditor['general_kyc_cred'].encode('utf-8'))
+    print('sec | encrypt kyc credential')
+    sec['authcrypted_cred'] = await crypto.auth_crypt(sec['wallet'], sec['key_for_sig'], sec['sig_key_for_sec'], sec['cred'].encode('utf-8'))
 
-    print("General Auditor -> Send encrypted General KYC Credential to JP Morgan")
-    jp_morgan['authcrypted_general_kyc_cred'] = general_auditor['authcrypted_general_kyc_cred']
+    print('sec | send encrypted kyc credential to sig')
+    sig['sec_authcrypted_cred'] = sec['authcrypted_cred']
 
-    print("========================================")
+    print('sec | post revocation registry delta to ledger')
+    await send_revoc_reg_entry_or_delta(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_id'], sec['cred_rev_reg_delta'])
 
-    print("Financial Auditor -> Decrypt Financial KYC Credential Request from JP Morgan")
-    (financial_auditor['jp_morgan_key_for_financial_auditor'], financial_auditor['financial_kyc_cred_request'], _) = await auth_decrypt(financial_auditor['wallet'],
-                                                                                                                                        financial_auditor['key_for_jp_morgan'],
-                                                                                                                                        financial_auditor['authcrypted_financial_kyc_cred_request'])
+    print('----------------------------------------')
+    input('')
 
-    print("Financial Auditor -> Create Financial KYC Credential for JP Morgan")
-    financial_auditor['jp_morgan_financial_kyc_cred_values'] = json.dumps({
-        "taxCountry": {"raw": "U.S.A.", "encoded": "30313233343536373839"},
-        "industryClassificationCode": {"raw": "3452", "encoded": "3452"},
-        "liquidity": {"raw": "2.8", "encoded": "2.8"},
-        "exposureCap": {"raw": "0.5", "encoded": "0.5"},
-        "creditRating": {"raw": "4", "encoded": "4"}
+
+async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(gs, sig):
+    print('sec | decrypt kyc credential request from sig')
+    (gs['sig_key_for_gs'], gs['cred_request'], _) = await auth_decrypt(gs['wallet'], gs['key_for_sig'], gs['authcrypted_cred_request'])
+
+    print('sec | create kyc credential : {legalName: Two Sigma Coop., primarySicCode: 1102, address: 207A, Mulberry Woods, New York}')
+    gs['sig_cred_values'] = json.dumps({
+        'liquidity': {'raw': '2.8', 'encoded': '2.8'},
+        'rating': {'raw': '4', 'encoded': '4'}
     })
-    (financial_auditor['financial_kyc_cred'], _, _) = await anoncreds.issuer_create_credential(financial_auditor['wallet'],
-                                                                                               financial_auditor['financial_kyc_cred_offer'],
-                                                                                               financial_auditor['financial_kyc_cred_request'],
-                                                                                               financial_auditor['jp_morgan_financial_kyc_cred_values'],
-                                                                                               None,
-                                                                                               None)
+    tails_config_reader = await blob_storage.open_reader('default', gs['tails_config'])
+    (gs['cred'], gs['cred_rev_id'], gs['cred_rev_reg_delta']) = await anoncreds.issuer_create_credential(gs['wallet'], gs['cred_offer'], gs['cred_request'], gs['sig_cred_values'],
+                                                                                                         gs['cred_revoc_reg_id'], tails_config_reader)
 
-    print("Financial Auditor -> Encrypt Financial KYC Credential for JP Morgan")
-    financial_auditor['authcrypted_financial_kyc_cred'] = await crypto.auth_crypt(financial_auditor['wallet'],
-                                                                                  financial_auditor['key_for_jp_morgan'],
-                                                                                  financial_auditor['jp_morgan_key_for_financial_auditor'],
-                                                                                  financial_auditor['financial_kyc_cred'].encode('utf-8'))
+    print('sec | encrypt kyc credential')
+    gs['authcrypted_cred'] = await crypto.auth_crypt(gs['wallet'], gs['key_for_sig'], gs['sig_key_for_gs'], gs['cred'].encode('utf-8'))
 
-    print("Financial Auditor -> Send encrypted Financial KYC Credential to JP Morgan")
-    jp_morgan['authcrypted_financial_kyc_cred'] = financial_auditor['authcrypted_financial_kyc_cred']
+    print('sec | send encrypted kyc credential to sig')
+    sig['gs_authcrypted_cred'] = gs['authcrypted_cred']
 
-    print("========================================")
+    print('sec | post revocation registry delta to ledger')
+    await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_rev_reg_delta'])
 
-    print("JP Morgan -> Decrypt General KYC Credential from General Auditor")
-    (_, jp_morgan['general_kyc_cred'], _) = await auth_decrypt(jp_morgan['wallet'],
-                                                               jp_morgan['key_for_general_auditor'],
-                                                               jp_morgan['authcrypted_general_kyc_cred'])
+    print('----------------------------------------')
+    input('')
 
-    print("JP Morgan -> Get General KYC Credential Definition from Ledger")
-    (_, jp_morgan['general_kyc_cred_def']) = await get_cred_def(jp_morgan['pool'],
-                                                                jp_morgan['did_for_general_auditor'],
-                                                                jp_morgan['general_kyc_cred_def_id'])
 
-    print("JP Morgan -> Store General KYC Credential in Wallet")
-    await anoncreds.prover_store_credential(jp_morgan['wallet'],
-                                            None,
-                                            jp_morgan['general_kyc_cred_request_metadata'],
-                                            jp_morgan['general_kyc_cred'],
-                                            jp_morgan['general_kyc_cred_def'],
-                                            None)
+async def sig___decrypt_cred_from_gs__store_cred_in_wallet(sig):
+    print('sig | decrypt kyc credential from sec')
+    (_, sig['sec_cred'], sec_cred) = await auth_decrypt(sig['wallet'], sig['key_for_sec'], sig['sec_authcrypted_cred'])
 
-    print("JP Morgan -> Decrypt Financial KYC Credential from Financial Auditor")
-    (_, jp_morgan['financial_kyc_cred'], _) = await auth_decrypt(jp_morgan['wallet'],
-                                                                 jp_morgan['key_for_financial_auditor'],
-                                                                 jp_morgan['authcrypted_financial_kyc_cred'])
+    print('sig | store kyc credential in wallet')
+    (_, sig['sec_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['sec_cred_def_id'])
+    (_, sig['sec_revoc_reg_def_json']) = await get_revoc_reg_def(sig['pool'], sig['did'], sec_cred['rev_reg_id'])
+    await anoncreds.prover_store_credential(sig['wallet'], None, sig['sec_cred_request_metadata'], sig['sec_cred'], sig['sec_cred_def'], sig['sec_revoc_reg_def_json'])
 
-    print("JP Morgan -> Get Financial KYC Credential Definition from Ledger")
-    (_, jp_morgan['financial_kyc_cred_def']) = await get_cred_def(jp_morgan['pool'],
-                                                                  jp_morgan['did_for_financial_auditor'],
-                                                                  jp_morgan['financial_kyc_cred_def_id'])
+    print('sig | decrypt kyc credential from gs')
+    (_, sig['gs_cred'], gs_cred) = await auth_decrypt(sig['wallet'], sig['key_for_gs'], sig['gs_authcrypted_cred'])
 
-    print("JP Morgan -> Store Financial KYC Credential in Wallet")
-    await anoncreds.prover_store_credential(jp_morgan['wallet'],
-                                            None,
-                                            jp_morgan['financial_kyc_cred_request_metadata'],
-                                            jp_morgan['financial_kyc_cred'],
-                                            jp_morgan['financial_kyc_cred_def'],
-                                            None)
+    print('sig | store kyc credential in wallet')
+    (_, sig['gs_cred_def']) = await get_cred_def(sig['pool'], sig['did'], sig['gs_cred_def_id'])
+    (_, sig['gs_revoc_reg_def_json']) = await get_revoc_reg_def(sig['pool'], sig['did'], gs_cred['rev_reg_id'])
+    await anoncreds.prover_store_credential(sig['wallet'], None, sig['gs_cred_request_metadata'], sig['gs_cred'], sig['gs_cred_def'], sig['gs_revoc_reg_def_json'])
 
-    print("========================================")
+    print('----------------------------------------')
+    input('')
 
-    print("Goldman Sachs -> Establish p2p connection with JP Morgan")
-    (goldman_sachs['did_for_jp_morgan'],
-     goldman_sachs['key_for_jp_morgan'],
-     jp_morgan['did_for_goldman_sachs'],
-     jp_morgan['key_for_goldman_sachs'],
-     goldman_sachs['jp_morgan_connection_response']) = await onboarding(goldman_sachs, jp_morgan)
 
-    print("Goldman Sachs -> Get JP Morgan\'s key")
-    goldman_sachs['jp_morgan_key_for_goldman_sachs'] = await did.key_for_did(goldman_sachs['pool'],
-                                                                             goldman_sachs['wallet'],
-                                                                             goldman_sachs['jp_morgan_connection_response']['did'])
+async def jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig):
+    await get_pseudonym(jp, sig)
 
-    print("Goldman Sachs -> Create General KYC Credential Proof Request")
-    nonce1 = await anoncreds.generate_nonce()
-    goldman_sachs['general_kyc_cred_proof_request'] = json.dumps({
-        'nonce': nonce1,
-        'name': 'General KYC Credential',
+    print('jp | create kyc credential proof request : {legalName, primarySicCode, address, liquidity, rating>=3}')
+    nonce = await anoncreds.generate_nonce()
+    jp['cred_proof_request'] = json.dumps({
+        'nonce': nonce,
+        'name': 'KYC Credential',
         'version': '0.1',
         'requested_attributes': {
             'attr1_referent': {
-                'name': 'id',
-                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+                'name': 'legalName',
+                'restrictions': [{'cred_def_id': jp['sec_cred_def_id']}]
             },
             'attr2_referent': {
-                'name': 'legalName',
-                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+                'name': 'primarySicCode',
+                'restrictions': [{'cred_def_id': jp['sec_cred_def_id']}]
             },
             'attr3_referent': {
-                'name': 'legalOwner',
-                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
+                'name': 'address',
+                'restrictions': [{'cred_def_id': jp['sec_cred_def_id']}]
             },
             'attr4_referent': {
-                'name': 'primarySicCode',
-                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
-            },
-            'attr5_referent': {
-                'name': 'address',
-                'restrictions': [{'cred_def_id': general_auditor['general_kyc_cred_def_id']}]
-            }
-        },
-        'requested_predicates': {}
-    })
-
-    print("Goldman Sachs -> Encrypt General KYC Credential Proof Request with JP Morgan\'s key")
-    goldman_sachs['authcrypted_general_kyc_cred_proof_request'] = await crypto.auth_crypt(goldman_sachs['wallet'],
-                                                                                          goldman_sachs['key_for_jp_morgan'],
-                                                                                          goldman_sachs['jp_morgan_key_for_goldman_sachs'],
-                                                                                          goldman_sachs['general_kyc_cred_proof_request'].encode('utf-8'))
-
-    print("Goldman Sachs -> Send encrypted General KYC Credential Proof Request to JP Morgan")
-    jp_morgan['authcrypted_general_kyc_cred_proof_request'] = goldman_sachs['authcrypted_general_kyc_cred_proof_request']
-
-    print("Goldman Sachs -> Create Financial KYC Credential Proof Request")
-    nonce2 = await anoncreds.generate_nonce()
-    goldman_sachs['financial_kyc_cred_proof_request'] = json.dumps({
-        'nonce': nonce2,
-        'name': 'Financial KYC Credential',
-        'version': '0.1',
-        'requested_attributes': {
-            'attr6_referent': {
-                'name': 'taxCountry',
-                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
-            },
-            'attr7_referent': {
-                'name': 'industryClassificationCode',
-                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
-            },
-            'attr8_referent': {
                 'name': 'liquidity',
-                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
-            },
-            'attr9_referent': {
-                'name': 'exposureCap',
-                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
+                'restrictions': [{'cred_def_id': jp['gs_cred_def_id']}]
             }
         },
         'requested_predicates': {
             'predicate1_referent': {
-                'name': 'creditRating',
+                'name': 'rating',
                 'p_type': '>=',
                 'p_value': 3,
-                'restrictions': [{'cred_def_id': financial_auditor['financial_kyc_cred_def_id']}]
+                'restrictions': [{'cred_def_id': jp['gs_cred_def_id']}]
             }
-        }
+        },
+        'non_revoked': {'to': int(time.time())}
     })
 
-    print("Goldman Sachs -> Encrypt Financial KYC Credential Proof Request with JP Morgan\'s key")
-    goldman_sachs['authcrypted_financial_kyc_cred_proof_request'] = await crypto.auth_crypt(goldman_sachs['wallet'],
-                                                                                            goldman_sachs['key_for_jp_morgan'],
-                                                                                            goldman_sachs['jp_morgan_key_for_goldman_sachs'],
-                                                                                            goldman_sachs['financial_kyc_cred_proof_request'].encode('utf-8'))
+    print('jp | encrypt kyc credential proof request')
+    jp['sig_key_for_jp'] = await did.key_for_did(jp['pool'], jp['wallet'], jp['sig_connection_response']['did'])
+    jp['authcrypted_cred_proof_request'] = await crypto.auth_crypt(jp['wallet'], jp['key_for_sig'], jp['sig_key_for_jp'], jp['cred_proof_request'].encode('utf-8'))
 
-    print("Goldman Sachs -> Send encrypted Financial KYC Credential Proof Request to JP Morgan")
-    jp_morgan['authcrypted_financial_kyc_cred_proof_request'] = goldman_sachs['authcrypted_financial_kyc_cred_proof_request']
+    print('jp | send encrypted kyc credential proof request to sig')
+    sig['authcrypted_cred_proof_request'] = jp['authcrypted_cred_proof_request']
 
-    print("========================================")
+    print('----------------------------------------')
+    input('')
 
-    print("JP Morgan -> Decrypt General KYC Credential Proof Request from Goldman Sachs")
-    (jp_morgan['goldman_sachs_key_for_jp_morgan'], jp_morgan['general_kyc_cred_proof_request'], _) = await auth_decrypt(jp_morgan['wallet'],
-                                                                                                                        jp_morgan['key_for_goldman_sachs'],
-                                                                                                                        jp_morgan['authcrypted_general_kyc_cred_proof_request'])
 
-    print("JP Morgan -> Get credentials for General KYC Credential Proof Request")
-    search_for_general_kyc_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(jp_morgan['wallet'],
-                                                                                                        jp_morgan['general_kyc_cred_proof_request'],
-                                                                                                        None)
-    cred_for_attr1 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr1_referent')
-    cred_for_attr2 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr2_referent')
-    cred_for_attr3 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr3_referent')
-    cred_for_attr4 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr4_referent')
-    cred_for_attr5 = await get_credential_for_referent(search_for_general_kyc_cred_proof_request, 'attr5_referent')
-    await anoncreds.prover_close_credentials_search_for_proof_req(search_for_general_kyc_cred_proof_request)
-    jp_morgan['creds_for_general_kyc_cred_proof'] = {cred_for_attr1['referent']: cred_for_attr1,
-                                                     cred_for_attr2['referent']: cred_for_attr2,
-                                                     cred_for_attr3['referent']: cred_for_attr3,
-                                                     cred_for_attr4['referent']: cred_for_attr4,
-                                                     cred_for_attr5['referent']: cred_for_attr5}
-    (jp_morgan['general_kyc_schemas'],
-     jp_morgan['general_kyc_cred_defs'],
-     jp_morgan['general_kyc_revoc_states']) = await prover_get_entities_from_ledger(jp_morgan['pool'],
-                                                                                    jp_morgan['did_for_goldman_sachs'],
-                                                                                    jp_morgan['creds_for_general_kyc_cred_proof'])
+async def sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp):
+    print('sig | decrypt kyc credential proof request from jp')
+    (sig['jp_key_for_sig'], sig['cred_proof_request'], _) = await auth_decrypt(sig['wallet'], sig['key_for_jp'], sig['authcrypted_cred_proof_request'])
 
-    print("JP Morgan -> Create General KYC Credential Proof")
-    jp_morgan['general_kyc_cred_requested_creds'] = json.dumps({
+    print('sig | get credentials for kyc credential proof request')
+    requested_credentials = json.loads(await anoncreds.prover_get_credentials_for_proof_req(sig['wallet'], sig['cred_proof_request']))
+    cred_for_attr1 = requested_credentials['attrs']['attr1_referent'][0]['cred_info']
+    cred_for_attr2 = requested_credentials['attrs']['attr2_referent'][0]['cred_info']
+    cred_for_attr3 = requested_credentials['attrs']['attr3_referent'][0]['cred_info']
+    cred_for_attr4 = requested_credentials['attrs']['attr4_referent'][0]['cred_info']
+    cred_for_predicate1 = requested_credentials['predicates']['predicate1_referent'][0]['cred_info']
+    sig['creds_for_cred_proof'] = {cred_for_attr1['referent']: cred_for_attr1,
+                                   cred_for_attr2['referent']: cred_for_attr2,
+                                   cred_for_attr3['referent']: cred_for_attr3,
+                                   cred_for_attr4['referent']: cred_for_attr4,
+                                   cred_for_predicate1['referent']: cred_for_predicate1}
+    requested_timestamp = int(json.loads(sig['cred_proof_request'])['non_revoked']['to'])
+    (sig['cred_schemas'], sig['cred_defs'], sig['cred_revoc_states']) = await prover_get_entities_from_ledger(sig['pool'], sig['did'], sig['creds_for_cred_proof'],
+                                                                                                              None, requested_timestamp)
+
+    print('sig | create kyc credential proof')
+    revoc_states_for_cred = json.loads(sig['cred_revoc_states'])
+    timestamp_for_attr1 = get_timestamp_for_attribute(cred_for_attr1, revoc_states_for_cred)
+    timestamp_for_attr2 = get_timestamp_for_attribute(cred_for_attr2, revoc_states_for_cred)
+    timestamp_for_attr3 = get_timestamp_for_attribute(cred_for_attr3, revoc_states_for_cred)
+    timestamp_for_attr4 = get_timestamp_for_attribute(cred_for_attr4, revoc_states_for_cred)
+    timestamp_for_predicate1 = get_timestamp_for_attribute(cred_for_predicate1, revoc_states_for_cred)
+    sig['cred_requested_creds'] = json.dumps({
         'self_attested_attributes': {},
-        'requested_attributes': {'attr1_referent': {'cred_id': cred_for_attr1['referent'], 'revealed': True},
-                                 'attr2_referent': {'cred_id': cred_for_attr2['referent'], 'revealed': True},
-                                 'attr3_referent': {'cred_id': cred_for_attr3['referent'], 'revealed': True},
-                                 'attr4_referent': {'cred_id': cred_for_attr4['referent'], 'revealed': True},
-                                 'attr5_referent': {'cred_id': cred_for_attr5['referent'], 'revealed': True}},
-        'requested_predicates': {}
+        'requested_attributes': {'attr1_referent': {'cred_id': cred_for_attr1['referent'], 'revealed': True, 'timestamp': timestamp_for_attr1},
+                                 'attr2_referent': {'cred_id': cred_for_attr2['referent'], 'revealed': True, 'timestamp': timestamp_for_attr2},
+                                 'attr3_referent': {'cred_id': cred_for_attr3['referent'], 'revealed': True, 'timestamp': timestamp_for_attr3},
+                                 'attr4_referent': {'cred_id': cred_for_attr4['referent'], 'revealed': True, 'timestamp': timestamp_for_attr4}},
+        'requested_predicates': {'predicate1_referent': {'cred_id': cred_for_predicate1['referent'], 'timestamp': timestamp_for_predicate1}}
     })
-    jp_morgan['general_kyc_cred_proof'] = await anoncreds.prover_create_proof(jp_morgan['wallet'],
-                                                                              jp_morgan['general_kyc_cred_proof_request'],
-                                                                              jp_morgan['general_kyc_cred_requested_creds'],
-                                                                              jp_morgan['master_secret_id'],
-                                                                              jp_morgan['general_kyc_schemas'],
-                                                                              jp_morgan['general_kyc_cred_defs'],
-                                                                              jp_morgan['general_kyc_revoc_states'])
+    sig['cred_proof'] = await anoncreds.prover_create_proof(sig['wallet'], sig['cred_proof_request'], sig['cred_requested_creds'],
+                                                            sig['master_secret_id'], sig['cred_schemas'], sig['cred_defs'], sig['cred_revoc_states'])
 
-    print("JP Morgan -> Encrypt General KYC Credential Proof for Goldman Sachs")
-    jp_morgan['authcrypted_general_kyc_cred_proof'] = await crypto.auth_crypt(jp_morgan['wallet'],
-                                                                              jp_morgan['key_for_goldman_sachs'],
-                                                                              jp_morgan['goldman_sachs_key_for_jp_morgan'],
-                                                                              jp_morgan['general_kyc_cred_proof'].encode('utf-8'))
+    print('sig | encrypt kyc credential proof')
+    sig['authcrypted_cred_proof'] = await crypto.auth_crypt(sig['wallet'], sig['key_for_jp'], sig['jp_key_for_sig'], sig['cred_proof'].encode('utf-8'))
 
-    print("JP Morgan -> Send encrypted General KYC Credential Proof to Goldman Sachs")
-    goldman_sachs['authcrypted_general_kyc_cred_proof'] = jp_morgan['authcrypted_general_kyc_cred_proof']
+    print('sig | send encrypted kyc credential proof to jp')
+    jp['authcrypted_cred_proof'] = sig['authcrypted_cred_proof']
 
-    print("JP Morgan -> Decrypt Financial KYC Credential Proof Request from Goldman Sachs")
-    (jp_morgan['goldman_sachs_key_for_jp_morgan'], jp_morgan['financial_kyc_cred_proof_request'], _) = await auth_decrypt(jp_morgan['wallet'],
-                                                                                                                          jp_morgan['key_for_goldman_sachs'],
-                                                                                                                          jp_morgan['authcrypted_financial_kyc_cred_proof_request'])
+    print('----------------------------------------')
+    input('')
 
-    print("JP Morgan -> Get credentials for Financial KYC Credential Proof Request")
-    search_for_financial_kyc_cred_proof_request = await anoncreds.prover_search_credentials_for_proof_req(jp_morgan['wallet'],
-                                                                                                          jp_morgan['financial_kyc_cred_proof_request'],
-                                                                                                          None)
-    cred_for_attr6 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr6_referent')
-    cred_for_attr7 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr7_referent')
-    cred_for_attr8 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr8_referent')
-    cred_for_attr9 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'attr9_referent')
-    cred_for_predicate1 = await get_credential_for_referent(search_for_financial_kyc_cred_proof_request, 'predicate1_referent')
-    await anoncreds.prover_close_credentials_search_for_proof_req(search_for_financial_kyc_cred_proof_request)
-    jp_morgan['creds_for_financial_kyc_cred_proof'] = {cred_for_attr6['referent']: cred_for_attr6,
-                                                       cred_for_attr7['referent']: cred_for_attr7,
-                                                       cred_for_attr8['referent']: cred_for_attr8,
-                                                       cred_for_attr9['referent']: cred_for_attr9,
-                                                       cred_for_predicate1['referent']: cred_for_predicate1}
-    (jp_morgan['financial_kyc_schemas'],
-     jp_morgan['financial_kyc_cred_defs'],
-     jp_morgan['financial_kyc_revoc_states']) = await prover_get_entities_from_ledger(jp_morgan['pool'],
-                                                                                      jp_morgan['did_for_goldman_sachs'],
-                                                                                      jp_morgan['creds_for_financial_kyc_cred_proof'])
 
-    print("JP Morgan -> Create Financial KYC Credential Proof")
-    jp_morgan['financial_kyc_cred_requested_creds'] = json.dumps({
-        'self_attested_attributes': {},
-        'requested_attributes': {'attr6_referent': {'cred_id': cred_for_attr6['referent'], 'revealed': True},
-                                 'attr7_referent': {'cred_id': cred_for_attr7['referent'], 'revealed': True},
-                                 'attr8_referent': {'cred_id': cred_for_attr8['referent'], 'revealed': True},
-                                 'attr9_referent': {'cred_id': cred_for_attr9['referent'], 'revealed': True}},
-        'requested_predicates': {'predicate1_referent': {'cred_id': cred_for_predicate1['referent']}}
-    })
-    jp_morgan['financial_kyc_cred_proof'] = await anoncreds.prover_create_proof(jp_morgan['wallet'],
-                                                                                jp_morgan['financial_kyc_cred_proof_request'],
-                                                                                jp_morgan['financial_kyc_cred_requested_creds'],
-                                                                                jp_morgan['master_secret_id'],
-                                                                                jp_morgan['financial_kyc_schemas'],
-                                                                                jp_morgan['financial_kyc_cred_defs'],
-                                                                                jp_morgan['financial_kyc_revoc_states'])
+async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, revoked):
+    print('jp | decrypt kyc credential proof from sig')
+    (_, jp['cred_proof'], cred_proof) = await auth_decrypt(jp['wallet'], jp['key_for_sig'], jp['authcrypted_cred_proof'])
+    requested_timestamp = int(json.loads(jp['cred_proof_request'])['non_revoked']['to'])
+    (jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs']) = await verifier_get_entities_from_ledger(jp['pool'], jp['did'], cred_proof['identifiers'],
+                                                                                                                                      requested_timestamp)
 
-    print("JP Morgan -> Encrypt Financial KYC Credential Proof for Goldman Sachs")
-    jp_morgan['authcrypted_financial_kyc_cred_proof'] = await crypto.auth_crypt(jp_morgan['wallet'],
-                                                                                jp_morgan['key_for_goldman_sachs'],
-                                                                                jp_morgan['goldman_sachs_key_for_jp_morgan'],
-                                                                                jp_morgan['financial_kyc_cred_proof'].encode('utf-8'))
+    if revoked:
+        print('jp | verify kyc credentials are revoked')
+        assert not await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
+    else:
+        print('jp | verify kyc credentials are valid')
+        assert await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
 
-    print("JP Morgan -> Send encrypted Financial KYC Credential Proof to Goldman Sachs")
-    goldman_sachs['authcrypted_financial_kyc_cred_proof'] = jp_morgan['authcrypted_financial_kyc_cred_proof']
+        print('jp | verify kyc credential proof values')
+        assert 'Two Sigma Coop.' == cred_proof['requested_proof']['revealed_attrs']['attr1_referent']['raw']
+        assert '1102' == cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
+        assert '207A, Mulberry Woods, New York' == cred_proof['requested_proof']['revealed_attrs']['attr3_referent']['raw']
+        assert '2.8' == cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
 
-    print("========================================")
+    print('----------------------------------------')
+    input('')
 
-    print("Goldman Sachs -> Decrypt General KYC Credential Proof from JP Morgan")
-    (_, goldman_sachs['general_kyc_cred_proof'], decrypted_general_kyc_cred_proof) = await auth_decrypt(goldman_sachs['wallet'],
-                                                                                                        goldman_sachs['key_for_jp_morgan'],
-                                                                                                        goldman_sachs['authcrypted_general_kyc_cred_proof'])
-    (goldman_sachs['general_kyc_schemas'],
-     goldman_sachs['general_kyc_cred_defs'],
-     goldman_sachs['general_kyc_revoc_ref_defs'],
-     goldman_sachs['general_kyc_revoc_regs']) = await verifier_get_entities_from_ledger(goldman_sachs['pool'],
-                                                                                        goldman_sachs['did'],
-                                                                                        decrypted_general_kyc_cred_proof['identifiers'])
 
-    print("Goldman Sachs -> Verify General KYC Credential Proof from JP Morgan")
-    assert '101' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr1_referent']['raw']
-    assert 'JP Morgan Coop.' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr2_referent']['raw']
-    assert 'Mr. Morgan' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr3_referent']['raw']
-    assert '1102' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr4_referent']['raw']
-    assert '207A, Mulberry Woods, New York' == decrypted_general_kyc_cred_proof['requested_proof']['revealed_attrs']['attr5_referent']['raw']
-    assert await anoncreds.verifier_verify_proof(goldman_sachs['general_kyc_cred_proof_request'],
-                                                 goldman_sachs['general_kyc_cred_proof'],
-                                                 goldman_sachs['general_kyc_schemas'],
-                                                 goldman_sachs['general_kyc_cred_defs'],
-                                                 goldman_sachs['general_kyc_revoc_ref_defs'],
-                                                 goldman_sachs['general_kyc_revoc_regs'])
+async def gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs):
+    print('gs | revoke kyc credential for sig')
+    tails_config_reader = await blob_storage.open_reader('default', gs['tails_config'])
+    gs['cred_rev_reg_delta'] = await anoncreds.issuer_revoke_credential(gs['wallet'], tails_config_reader, gs['cred_revoc_reg_id'], gs['cred_rev_id'])
 
-    print("Goldman Sachs -> Decrypt Financial KYC Credential Proof from JP Morgan")
-    (_, goldman_sachs['financial_kyc_cred_proof'], decrypted_financial_kyc_cred_proof) = await auth_decrypt(goldman_sachs['wallet'],
-                                                                                                            goldman_sachs['key_for_jp_morgan'],
-                                                                                                            goldman_sachs['authcrypted_financial_kyc_cred_proof'])
-    (goldman_sachs['financial_kyc_schemas'],
-     goldman_sachs['financial_kyc_cred_defs'],
-     goldman_sachs['financial_kyc_revoc_ref_defs'],
-     goldman_sachs['financial_kyc_revoc_regs']) = await verifier_get_entities_from_ledger(goldman_sachs['pool'],
-                                                                                          goldman_sachs['did'],
-                                                                                          decrypted_financial_kyc_cred_proof['identifiers'])
+    print('gs | post revocation registry delta to ledger')
+    await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_rev_reg_delta'])
 
-    print("Goldman Sachs -> Verify Financial KYC Credential Proof from JP Morgan")
-    assert 'U.S.A.' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr6_referent']['raw']
-    assert '3452' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr7_referent']['raw']
-    assert '2.8' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr8_referent']['raw']
-    assert '0.5' == decrypted_financial_kyc_cred_proof['requested_proof']['revealed_attrs']['attr9_referent']['raw']
-    assert await anoncreds.verifier_verify_proof(goldman_sachs['financial_kyc_cred_proof_request'],
-                                                 goldman_sachs['financial_kyc_cred_proof'],
-                                                 goldman_sachs['financial_kyc_schemas'],
-                                                 goldman_sachs['financial_kyc_cred_defs'],
-                                                 goldman_sachs['financial_kyc_revoc_ref_defs'],
-                                                 goldman_sachs['financial_kyc_revoc_regs'])
+    print('----------------------------------------')
+    input('')
 
-    print("========================================")
 
-    print("Close and Delete Government\'s Wallet")
-    await wallet.close_wallet(government['wallet'])
-    await wallet.delete_wallet(government['wallet_config'], government['wallet_credentials'])
-
-    print("Close and Delete SEC\'s Wallet")
-    await wallet.close_wallet(sec['wallet'])
-    await wallet.delete_wallet(sec['wallet_config'], sec['wallet_credentials'])
-
-    print("Close and Delete General Auditor\'s Wallet")
-    await wallet.close_wallet(general_auditor['wallet'])
-    await wallet.delete_wallet(general_auditor['wallet_config'], general_auditor['wallet_credentials'])
-
-    print("Close and Delete Financial Auditor\'s Wallet")
-    await wallet.close_wallet(financial_auditor['wallet'])
-    await wallet.delete_wallet(financial_auditor['wallet_config'], financial_auditor['wallet_credentials'])
-
-    print("Close and Delete Goldman Sachs\'s Wallet")
-    await wallet.close_wallet(goldman_sachs['wallet'])
-    await wallet.delete_wallet(goldman_sachs['wallet_config'], goldman_sachs['wallet_credentials'])
-
-    print("Close and Delete JP Morgan\'s Wallet")
-    await wallet.close_wallet(jp_morgan['wallet'])
-    await wallet.delete_wallet(jp_morgan['wallet_config'], jp_morgan['wallet_credentials'])
-
-    print("Close and Delete Pool")
+async def system___tear_down(pool_, gov, sec, gs, jp, sig):
+    print('close and delete pool')
     await pool.close_pool_ledger(pool_['handle'])
     await pool.delete_pool_ledger_config(pool_['name'])
 
-    print("========================================")
-    print("=============== End Demo ===============")
-    print("========================================")
+    print('close and delete gov\'s wallet')
+    await wallet.close_wallet(gov['wallet'])
+    await wallet.delete_wallet(gov['wallet_config'], gov['wallet_credentials'])
+
+    print('close and delete sec\'s wallet')
+    await wallet.close_wallet(sec['wallet'])
+    await wallet.delete_wallet(sec['wallet_config'], sec['wallet_credentials'])
+
+    print('close and delete gs\'s wallet')
+    await wallet.close_wallet(gs['wallet'])
+    await wallet.delete_wallet(gs['wallet_config'], gs['wallet_credentials'])
+
+    print('close and delete jp\'s wallet')
+    await wallet.close_wallet(jp['wallet'])
+    await wallet.delete_wallet(jp['wallet_config'], jp['wallet_credentials'])
+
+    print('close and delete sig\'s wallet')
+    await wallet.close_wallet(sig['wallet'])
+    await wallet.delete_wallet(sig['wallet_config'], sig['wallet_credentials'])
+
+    print('----------------------------------------')
+    input('')
 
 
-async def onboarding(_from, _to):
+async def from___create_did_and_key__post_did_and_key_to_ledger__send_did_and_nonce_to_to(_from, _to):
+    from_name = _from['name']
+    to_name = _to['name']
+    did_for_to = 'did_for_' + to_name
+    key_for_to = 'key_for_' + to_name
+    (_from[did_for_to], _from[key_for_to]) = await did.create_and_store_my_did(_from['wallet'], '{}')
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], _from[did_for_to], _from[key_for_to], None)
 
-    print(tab + "====================================")
+    nonce = await anoncreds.generate_nonce()
+    _from['connection_request'] = {'did': _from[did_for_to], 'nonce': nonce}
+    _to[from_name + '_connection_request'] = _from['connection_request']
 
-    print(tab + _from['name'] + ' -> Create pairwise did and key for ' + _to['name'] + ' and store in wallet')
-    (from_to_did, from_to_key) = await did.create_and_store_my_did(_from['wallet'], "{}")
 
-    print(tab + _from['name'] + ' -> Send the pairwise did and key to ledger')
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], from_to_did, from_to_key, None)
-
-    print(tab + _from['name'] + ' -> Create connection request for ' + _to['name'] + ' with the pairwise did and a nonce')
-    _from['connection_request'] = {'did': from_to_did,
-                                   'nonce': 123456789}
-
-    print(tab + _from['name'] + ' -> Send connection request to ' + _to['name'])
-    _to['connection_request'] = _from['connection_request']
-
-    print(tab + "====================================")
-
-    print(tab + _to['name'] + ' -> Create wallet')
+async def to___create_wallet__create_did_and_key__encrypt_did_and_key_and_nonce__send_did_and_key_and_nonce_to_from(_to, _from):
     if 'wallet' not in _to:
-        try:
-            await wallet.create_wallet(_to['wallet_config'], _to['wallet_credentials'])
-        except IndyError as ex:
-            if ex.error_code == ErrorCode.PoolLedgerConfigAlreadyExistsError:
-                pass
+        await wallet.create_wallet(_to['wallet_config'], _to['wallet_credentials'])
         _to['wallet'] = await wallet.open_wallet(_to['wallet_config'], _to['wallet_credentials'])
 
-    print(tab + _to['name'] + ' -> Create pairwise did and key for ' + _from['name'] + ' and store in wallet')
-    (to_from_did, to_from_key) = await did.create_and_store_my_did(_to['wallet'], "{}")
+    to_name = _to['name']
+    from_name = _from['name']
+    did_for_from = 'did_for_' + from_name
+    key_for_from = 'key_for_' + from_name
+    (_to[did_for_from], _to[key_for_from]) = await did.create_and_store_my_did(_to['wallet'], '{}')
 
-    print(tab + _to['name'] + ' -> Create connection response for ' + _from['name'] + ' with the pairwise did and key and the nonce')
     _to['connection_response'] = json.dumps({
-        'did': to_from_did,
-        'verkey': to_from_key,
-        'nonce': _to['connection_request']['nonce']
+        'did': _to[did_for_from],
+        'key': _to[key_for_from],
+        'nonce': _to[from_name + '_connection_request']['nonce']
     })
+    _to['key_of_from_for_to'] = await did.key_for_did(_to['pool'], _to['wallet'], _to[from_name + '_connection_request']['did'])
+    _to['anoncrypted_connection_response'] = await crypto.anon_crypt(_to['key_of_from_for_to'], _to['connection_response'].encode('utf-8'))
 
-    print(tab + _to['name'] + ' -> Get ' + _from['name']  + '\'s pairwise key from ledger')
-    from_to_verkey = await did.key_for_did(_from['pool'], _to['wallet'], _to['connection_request']['did'])
+    _from[to_name + '_anoncrypted_connection_response'] = _to['anoncrypted_connection_response']
 
-    print(tab + _to['name'] + ' -> Encrypt connection response with '  + _from['name']  + '\'s pairwise key')
-    _to['anoncrypted_connection_response'] = await crypto.anon_crypt(from_to_verkey, _to['connection_response'].encode('utf-8'))
 
-    print(tab + _to['name'] + ' -> Send connection response to ' + _from['name'])
-    _from['anoncrypted_connection_response'] = _to['anoncrypted_connection_response']
+async def from___decrypt_did_and_key_and_nonce__verify_nonce__post_did_and_key_to_ledger(_from, _to):
+    to_name = _to['name']
+    key_for_to = 'key_for_' + to_name
+    _from[to_name + '_connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'], _from[key_for_to],
+                                                                                    _from[to_name + '_anoncrypted_connection_response'])).decode('utf-8'))
 
-    print(tab + "====================================")
+    assert _from['connection_request']['nonce'] == _from[to_name + '_connection_response']['nonce']
 
-    print(tab + _from['name'] + ' -> Decrypt connection response from ' + _to['name'])
-    _from['connection_response'] = json.loads((await crypto.anon_decrypt(_from['wallet'],
-                                                                         from_to_key,
-                                                                         _from['anoncrypted_connection_response'])).decode("utf-8"))
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], _from[to_name + '_connection_response']['did'], _from[to_name + '_connection_response']['key'], None)
 
-    print(tab + _from['name'] + ' -> Get nonce from response and validate with original nonce')
-    assert _from['connection_request']['nonce'] == _from['connection_response']['nonce']
 
-    print(tab + _from['name'] + ' -> Send ' + _to['name'] + '\'s pairwise did and key to ledger')
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], to_from_did, to_from_key, None)
+async def to___create_did_and_key__encrypt_did_and_key_and_role__send_did_and_key_and_role_to_from(_to, _from):
+    (_to['did'], _to['key']) = await did.create_and_store_my_did(_to['wallet'], '{}')
 
-    print(tab + "====================================")
+    _to['did_info'] = json.dumps({'did': _to['did'], 'key': _to['key'], 'role': _to['role']}).encode('utf-8')
+    to_name = _to['name']
+    from_name = _from['name']
+    key_for_from = 'key_for_' + from_name
+    _to['authcrypted_did_info'] = await crypto.auth_crypt(_to['wallet'], _to[key_for_from], _to['key_of_from_for_to'], _to['did_info'])
 
-    return (from_to_did, from_to_key, to_from_did, to_from_key, _from['connection_response'])
+    _from[to_name + '_authcrypted_did_info'] = _to['authcrypted_did_info']
+
+
+async def from___decrypt_did_and_key_and_role__verify_key__post_did_and_key_and_role_to_leger(_from, _to):
+    to_name = _to['name']
+    key_for_to = 'key_for_' + to_name
+    (sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info) = await auth_decrypt(_from['wallet'], _from[key_for_to], _from[to_name + '_authcrypted_did_info'])
+
+    assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], _from[to_name + '_connection_response']['did'])
+
+    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['key'], authdecrypted_did_info['role'])
+
+
+async def get_pseudonym(_from, _to):
+    await from___create_did_and_key__post_did_and_key_to_ledger__send_did_and_nonce_to_to(_from, _to)
+    await to___create_wallet__create_did_and_key__encrypt_did_and_key_and_nonce__send_did_and_key_and_nonce_to_from(_to, _from)
+    await from___decrypt_did_and_key_and_nonce__verify_nonce__post_did_and_key_to_ledger(_from, _to)
 
 
 async def get_verinym(_from, _to):
+    await to___create_did_and_key__encrypt_did_and_key_and_role__send_did_and_key_and_role_to_from(_to, _from)
+    await from___decrypt_did_and_key_and_role__verify_key__post_did_and_key_and_role_to_leger(_from, _to)
 
-    name = _to['name']
-    from_to_key = _from['key_for_' + name]
-    to_from_did = _to['did_for_government']
-    to_from_key = _to['key_for_government']
 
-    print(tab + _to['name'] + ' -> Create did and key and store in wallet')
-    (to_did, to_key) = await did.create_and_store_my_did(_to['wallet'], "{}")
+async def prover_get_entities_from_ledger(pool_handle, _did, identifiers, timestamp_from=None, timestamp_to=None):
+    schemas = {}
+    cred_defs = {}
+    rev_states = {}
+    for item in identifiers.values():
+        (received_schema_id, received_schema) = await get_schema(pool_handle, _did, item['schema_id'])
+        schemas[received_schema_id] = json.loads(received_schema)
 
-    print(tab + _to['name'] + ' -> Create message info with the did and key')
-    _to['did_info'] = json.dumps({'did': to_did,
-                                  'verkey': to_key})
+        (received_cred_def_id, received_cred_def) = await get_cred_def(pool_handle, _did, item['cred_def_id'])
+        cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
-    print(tab + _to['name'] + ' -> Encrypt the message and it\'s own pairwise key with ' + _from['name'] + '\'s pairwise key ')
-    _to['authcrypted_did_info'] = await crypto.auth_crypt(_to['wallet'], to_from_key, from_to_key, _to['did_info'].encode('utf-8'))
+        if 'rev_reg_id' in item and item['rev_reg_id'] is not None:
+            (rev_reg_id, revoc_reg_def_json) = await get_revoc_reg_def(pool_handle, _did, item['rev_reg_id'])
+            if not timestamp_to: timestamp_to = int(time.time())
+            (rev_reg_id, revoc_reg_delta_json, t) = await get_revoc_reg_delta(pool_handle, _did, item['rev_reg_id'], timestamp_from, timestamp_to)
+            tails_reader_config = json.dumps({'base_dir': dirname(json.loads(revoc_reg_def_json)['value']['tailsLocation']), 'uri_pattern': ''})
+            blob_storage_reader_cfg_handle = await blob_storage.open_reader('default', tails_reader_config)
+            rev_state_json = await anoncreds.create_revocation_state(blob_storage_reader_cfg_handle, revoc_reg_def_json, revoc_reg_delta_json, t, item['cred_rev_id'])
+            rev_states[rev_reg_id] = {t: json.loads(rev_state_json)}
 
-    print(tab + _to['name'] + ' -> Send encrypted message to ' + _from['name'])
-    _from['authcrypted_did_info'] = _to['authcrypted_did_info']
+    return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_states)
 
-    print(tab + "====================================")
 
-    print(tab + _from['name'] + ' -> Decrypt message from ' + _to['name'])
-    (sender_verkey, authdecrypted_did_info_json, authdecrypted_did_info) = await auth_decrypt(_from['wallet'],
-                                                                                              from_to_key,
-                                                                                              _from['authcrypted_did_info'])
-    print(tab + _from['name'] + ' -> Get ' + _to['name'] + '\'s pairwise key from ledger and validate with sender\'s pairwise key in decrypted message')
-    assert sender_verkey == await did.key_for_did(_from['pool'], _from['wallet'], to_from_did)
+async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers, timestamp=None):
+    schemas = {}
+    cred_defs = {}
+    rev_reg_defs = {}
+    rev_regs = {}
+    for item in identifiers:
+        (received_schema_id, received_schema) = await get_schema(pool_handle, _did, item['schema_id'])
+        schemas[received_schema_id] = json.loads(received_schema)
 
-    print(tab + _from['name'] + ' -> Send ' + _to['name'] + '\'s did and key to ledger')
-    await send_nym(_from['pool'], _from['wallet'], _from['did'], authdecrypted_did_info['did'], authdecrypted_did_info['verkey'], _to['role'])
+        (received_cred_def_id, received_cred_def) = await get_cred_def(pool_handle, _did, item['cred_def_id'])
+        cred_defs[received_cred_def_id] = json.loads(received_cred_def)
 
-    print(tab + "====================================")
+        if 'rev_reg_id' in item and item['rev_reg_id'] is not None:
+            (rev_reg_id, revoc_reg_def_json) = await get_revoc_reg_def(pool_handle, _did, item['rev_reg_id'])
+            if not timestamp: timestamp = item['timestamp']
+            (rev_reg_id, rev_reg_json, timestamp2) = await get_revoc_reg(pool_handle, _did, item['rev_reg_id'], timestamp)
+            rev_regs[rev_reg_id] = {timestamp2: json.loads(rev_reg_json)}
+            rev_reg_defs[rev_reg_id] = json.loads(revoc_reg_def_json)
 
-    return to_did
+    return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_reg_defs), json.dumps(rev_regs)
+
+
+async def auth_decrypt(wallet_handle, key, message):
+    from_verkey, decrypted_message_json = await crypto.auth_decrypt(wallet_handle, key, message)
+    decrypted_message_json = decrypted_message_json.decode('utf-8')
+    decrypted_message = json.loads(decrypted_message_json)
+    return from_verkey, decrypted_message_json, decrypted_message
 
 
 async def send_nym(pool_handle, wallet_handle, _did, new_did, new_key, role):
@@ -817,6 +707,16 @@ async def send_cred_def(pool_handle, wallet_handle, _did, cred_def_json):
     await ledger.sign_and_submit_request(pool_handle, wallet_handle, _did, cred_def_request)
 
 
+async def send_revoc_reg_def(pool_handle, wallet_handle, _did, revoc_reg_def):
+    revoc_reg_def_request = await ledger.build_revoc_reg_def_request(_did, revoc_reg_def)
+    await ledger.sign_and_submit_request(pool_handle, wallet_handle, _did, revoc_reg_def_request)
+
+
+async def send_revoc_reg_entry_or_delta(pool_handle, wallet_handle, _did, revoc_reg_id, revoc_reg_entry_or_delta):
+    revoc_reg_entry_request = await ledger.build_revoc_reg_entry_request(_did, revoc_reg_id, 'CL_ACCUM', revoc_reg_entry_or_delta)
+    await ledger.sign_and_submit_request(pool_handle, wallet_handle, _did, revoc_reg_entry_request)
+
+
 async def get_schema(pool_handle, _did, schema_id):
     get_schema_request = await ledger.build_get_schema_request(_did, schema_id)
     get_schema_response = await ledger.submit_request(pool_handle, get_schema_request)
@@ -829,52 +729,29 @@ async def get_cred_def(pool_handle, _did, cred_def_id):
     return await ledger.parse_get_cred_def_response(get_cred_def_response)
 
 
-async def get_credential_for_referent(search_handle, referent):
-    credentials = json.loads(
-        await anoncreds.prover_fetch_credentials_for_proof_req(search_handle, referent, 10))
-    return credentials[0]['cred_info']
+async def get_revoc_reg_def(pool_handle, _did, revoc_reg_id):
+    get_revoc_reg_def_request = await ledger.build_get_revoc_reg_def_request(_did, revoc_reg_id)
+    get_revoc_reg_def_response = await ledger.submit_request(pool_handle, get_revoc_reg_def_request)
+    return await ledger.parse_get_revoc_reg_def_response(get_revoc_reg_def_response)
 
 
-async def prover_get_entities_from_ledger(pool_handle, _did, identifiers):
-    schemas = {}
-    cred_defs = {}
-    rev_states = {}
-    for item in identifiers.values():
-        (received_schema_id, received_schema) = await get_schema(pool_handle, _did, item['schema_id'])
-        schemas[received_schema_id] = json.loads(received_schema)
-
-        (received_cred_def_id, received_cred_def) = await get_cred_def(pool_handle, _did, item['cred_def_id'])
-        cred_defs[received_cred_def_id] = json.loads(received_cred_def)
-
-        if 'rev_reg_seq_no' in item:
-            pass
-
-    return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_states)
+async def get_revoc_reg(pool_handle, _did, revoc_reg_id, timestamp):
+    get_revoc_reg_request = await ledger.build_get_revoc_reg_request(_did, revoc_reg_id, timestamp)
+    get_revoc_reg_response = await ledger.submit_request(pool_handle, get_revoc_reg_request)
+    return await ledger.parse_get_revoc_reg_response(get_revoc_reg_response)
 
 
-async def verifier_get_entities_from_ledger(pool_handle, _did, identifiers):
-    schemas = {}
-    cred_defs = {}
-    rev_reg_defs = {}
-    rev_regs = {}
-    for item in identifiers:
-        (received_schema_id, received_schema) = await get_schema(pool_handle, _did, item['schema_id'])
-        schemas[received_schema_id] = json.loads(received_schema)
-
-        (received_cred_def_id, received_cred_def) = await get_cred_def(pool_handle, _did, item['cred_def_id'])
-        cred_defs[received_cred_def_id] = json.loads(received_cred_def)
-
-        if 'rev_reg_seq_no' in item:
-            pass
-
-    return json.dumps(schemas), json.dumps(cred_defs), json.dumps(rev_reg_defs), json.dumps(rev_regs)
+async def get_revoc_reg_delta(pool_handle, _did, revoc_reg_id, timestamp_from, timestamp_to):
+    get_revoc_reg_delta_request = await ledger.build_get_revoc_reg_delta_request(_did, revoc_reg_id, timestamp_from, timestamp_to)
+    get_revoc_reg_delta_response = await ledger.submit_request(pool_handle, get_revoc_reg_delta_request)
+    return await ledger.parse_get_revoc_reg_delta_response(get_revoc_reg_delta_response)
 
 
-async def auth_decrypt(wallet_handle, key, message):
-    from_verkey, decrypted_message_json = await crypto.auth_decrypt(wallet_handle, key, message)
-    decrypted_message_json = decrypted_message_json.decode("utf-8")
-    decrypted_message = json.loads(decrypted_message_json)
-    return from_verkey, decrypted_message_json, decrypted_message
+def get_timestamp_for_attribute(cred_for_attribute, revoc_states):
+    if cred_for_attribute['rev_reg_id'] in revoc_states:
+        return int(next(iter(revoc_states[cred_for_attribute['rev_reg_id']])))
+    else:
+        return None
 
 
 if __name__ == '__main__':
