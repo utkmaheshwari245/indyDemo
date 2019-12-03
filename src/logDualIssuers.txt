@@ -10,115 +10,117 @@ initialize jp (kyc credential verifier)
 initialize sig (kyc credential owner)
 ----------------------------------------
 
-gov | create kyc credential schema: {legalName, primarySicCode, address}
-gov | post kyc credential schema to ledger
-gov | send kyc credential schema id to sec
+gov | creates kyc credential schema: ['legalName', 'primarySicCode', 'address']
+gov | posts kyc credential schema to ledger
+gov | sends kyc credential schema id to sec
 ----------------------------------------
 
-gov | create kyc credential schema: {liquidity, rating}
-gov | post kyc credential schema to ledger
-gov | send kyc credential schema id to gs
+gov | creates kyc credential schema: ['liquidity', 'rating']
+gov | posts kyc credential schema to ledger
+gov | sends kyc credential schema id to gs
 ----------------------------------------
 
-sec | get kyc schema from Ledger
-sec | create kyc credential definition
-sec | post kyc credential definition to ledger
-sec | send kyc credential definition id to jp
+sec | gets kyc schema from Ledger
+sec | creates kyc credential definition
+sec | posts kyc credential definition to ledger
+sec | sends kyc credential definition id to jp
 ----------------------------------------
 
-gs | get kyc schema from ledger
-gs | create kyc credential definition
-gs | post kyc credential definition to ledger
-gs | send kyc credential definition id to jp
+gs | gets kyc schema from Ledger
+gs | creates kyc credential definition
+gs | posts kyc credential definition to ledger
+gs | sends kyc credential definition id to jp
 ----------------------------------------
 
-sec | create revocation registry
-sec | post revocation registry definition to ledger
-sec | post revocation registry entry to ledger
+sec | creates revocation registry
+sec | posts revocation registry definition to ledger
+sec | posts revocation registry entry to ledger
 ----------------------------------------
 
-gs | create revocation registry
-gs | post revocation registry definition to ledger
-gs | post revocation registry entry to ledger
+gs | creates revocation registry
+gs | posts revocation registry definition to ledger
+gs | posts revocation registry entry to ledger
 ----------------------------------------
 
-sec | create kyc credential offer for sig
-sec | encrypt kyc credential offer
-sec | send encrypted kyc credential offer to sig
+sec | creates kyc credential offer for sig
+sec | encrypts kyc credential offer
+sec | sends encrypted kyc credential offer to sig
 ----------------------------------------
 
-gs | create kyc credential offer for sig
-gs | encrypt kyc credential offer
-gs | send encrypted kyc credential offer to sig
+gs | creates kyc credential offer for sig
+gs | encrypts kyc credential offer
+gs | sends encrypted kyc credential offer to sig
 ----------------------------------------
 
-sig | decrypt kyc credential offer from sec
-sig | create kyc credential request
-sig | encrypt kyc credential request
-sig | send encrypted kyc credential request to sec
+sig | decrypts kyc credential offer from sec
+sig | creates kyc credential request
+sig | encrypts kyc credential request
+sig | sends encrypted kyc credential request to sec
 ----------------------------------------
 
-sig | decrypt kyc credential offer from gs
-sig | create kyc credential request
-sig | encrypt kyc credential request
-sig | send encrypted kyc credential request to gs
+sig | decrypts kyc credential offer from gs
+sig | creates kyc credential request
+sig | encrypts kyc credential request
+sig | sends encrypted kyc credential request to gs
 ----------------------------------------
 
-sec | decrypt kyc credential request from sig
-sec | create kyc credential : {legalName: Two Sigma Coop., primarySicCode: 1102, address: 207A, Mulberry Woods, New York}
-sec | encrypt kyc credential
-sec | send encrypted kyc credential to sig
-sec | post revocation registry delta to ledger
+sec | decrypts kyc credential request from sig
+sec | creates kyc credential : {'address': {'raw': '207A, Mulberry Woods, New York', 'encoded': '20212223242526272829'}, 'legalName': {'raw': 'Two Sigma Coop.', 'encoded': '00010203040506070809'}, 'primarySicCode': {'raw': '1102', 'encoded': '1102'}}
+sec | encrypts kyc credential
+sec | sends encrypted kyc credential to sig
+sec | posts revocation registry delta to ledger
 ----------------------------------------
 
-sec | decrypt kyc credential request from sig
-sec | create kyc credential : {legalName: Two Sigma Coop., primarySicCode: 1102, address: 207A, Mulberry Woods, New York}
-sec | encrypt kyc credential
-sec | send encrypted kyc credential to sig
-sec | post revocation registry delta to ledger
+gs | decrypts kyc credential request from sig
+gs | creates kyc credential : {'liquidity': {'raw': '2.8', 'encoded': '2.8'}, 'rating': {'raw': '4', 'encoded': '4'}}
+gs | encrypts kyc credential
+gs | sends encrypted kyc credential to sig
+gs | posts revocation registry delta to ledger
 ----------------------------------------
 
-sig | decrypt kyc credential from sec
-sig | store kyc credential in wallet
-sig | decrypt kyc credential from gs
-sig | store kyc credential in wallet
+sig | decrypts kyc credential from sec
+sig | stores kyc credential in wallet
 ----------------------------------------
 
-jp | create kyc credential proof request : {legalName, primarySicCode, address, liquidity, rating>=3}
-jp | encrypt kyc credential proof request
-jp | send encrypted kyc credential proof request to sig
+sig | decrypts kyc credential from gs
+sig | stores kyc credential in wallet
 ----------------------------------------
 
-sig | decrypt kyc credential proof request from jp
-sig | get credentials for kyc credential proof request
-sig | create kyc credential proof
-sig | encrypt kyc credential proof
-sig | send encrypted kyc credential proof to jp
+jp | creates kyc credential proof request : {legalName, primarySicCode, address, liquidity, rating>=3}
+jp | encrypts kyc credential proof request
+jp | sends encrypted kyc credential proof request to sig
 ----------------------------------------
 
-jp | decrypt kyc credential proof from sig
-jp | verify kyc credentials are valid
-jp | verify kyc credential proof values
+sig | decrypts kyc credential proof request from jp
+sig | gets credentials for kyc credential proof request
+sig | creates kyc credential proof
+sig | encrypts kyc credential proof
+sig | sends encrypted kyc credential proof to jp
 ----------------------------------------
 
-gs | revoke kyc credential for sig
-gs | post revocation registry delta to ledger
+jp | decrypts kyc credential proof from sig
+jp | verifies kyc credentials are valid
+jp | verifies kyc credential proof values
 ----------------------------------------
 
-jp | create kyc credential proof request : {legalName, primarySicCode, address, liquidity, rating>=3}
-jp | encrypt kyc credential proof request
-jp | send encrypted kyc credential proof request to sig
+gs | revokes kyc credential for sig
+gs | posts revocation registry delta to ledger
 ----------------------------------------
 
-sig | decrypt kyc credential proof request from jp
-sig | get credentials for kyc credential proof request
-sig | create kyc credential proof
-sig | encrypt kyc credential proof
-sig | send encrypted kyc credential proof to jp
+jp | creates kyc credential proof request : {legalName, primarySicCode, address, liquidity, rating>=3}
+jp | encrypts kyc credential proof request
+jp | sends encrypted kyc credential proof request to sig
 ----------------------------------------
 
-jp | decrypt kyc credential proof from sig
-jp | verify kyc credentials are revoked
+sig | decrypts kyc credential proof request from jp
+sig | gets credentials for kyc credential proof request
+sig | creates kyc credential proof
+sig | encrypts kyc credential proof
+sig | sends encrypted kyc credential proof to jp
+----------------------------------------
+
+jp | decrypts kyc credential proof from sig
+jp | verifies kyc credentials are revoked
 ----------------------------------------
 
 close and delete pool
