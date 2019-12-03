@@ -29,11 +29,8 @@ async def run():
     await sig___decrypt_cred_offer_from_sec__create_cred_request__encrypt_cred_request__send_cred_request_to_sec(sig, sec)
     await sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_request__send_cred_request_to_gs(sig, gs)
 
-    await sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(sec, sig)
-    await gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(gs, sig)
-
-    await sec___post_revocation_registry_delta_to_ledger(sec)
-    await gs___post_revocation_registry_delta_to_ledger(gs)
+    await sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(sec, sig)
+    await gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(gs, sig)
 
     await sig___decrypt_cred_from_gs__store_cred_in_wallet(sig)
 
@@ -43,13 +40,13 @@ async def run():
 
     await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, False)
 
-    # await gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
+    await gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs)
 
-    # await jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
+    await jp___establish_connection_with_sig__create_cred_proof_request__encrypt_cred_proof_request__send_cred_request_to_sig(jp, sig)
 
-    # await sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
+    await sig___decrypt_cred_proof_request_from_jp__create_cred_proof__encrypt_cred_proof__send_cred_proof_to_jp(sig, jp)
 
-    # await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
+    await jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, True)
 
     await system___tear_down(pool_, gov, sec, gs, jp, sig)
 
@@ -328,7 +325,7 @@ async def sig___decrypt_cred_offer_from_gs__create_cred_request__encrypt_cred_re
     input('')
 
 
-async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(sec, sig):
+async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(sec, sig):
     print('sec -> Decrypt KYC Credential Request from Two Sigma')
     (sec['sig_key_for_sec'], sec['cred_request'], _) = await auth_decrypt(sec['wallet'], sec['key_for_sig'], sec['authcrypted_cred_request'])
 
@@ -348,11 +345,14 @@ async def sec___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_c
     print('sec -> Send encrypted KYC Credential to Two Sigma')
     sig['sec_authcrypted_cred'] = sec['authcrypted_cred']
 
+    print('sec -> Post Revocation Registry Delta to Ledger')
+    await send_revoc_reg_entry_or_delta(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_id'], sec['cred_rev_reg_delta'])
+
     print('========================================')
     input('')
 
 
-async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig(gs, sig):
+async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cred_to_sig__post_revocation_registry_delta_to_ledger(gs, sig):
     print('Goldman Sachs -> Decrypt KYC Credential Request from Two Sigma')
     (gs['sig_key_for_gs'], gs['cred_request'], _) = await auth_decrypt(gs['wallet'], gs['key_for_sig'], gs['authcrypted_cred_request'])
 
@@ -371,18 +371,11 @@ async def gs___decrypt_cred_request_from_sig__create_cred__encrypt_cred__send_cr
     print('Goldman Sachs -> Send encrypted KYC Credential to Two Sigma')
     sig['gs_authcrypted_cred'] = gs['authcrypted_cred']
 
-    print('========================================')
-    input('')
-
-
-async def sec___post_revocation_registry_delta_to_ledger(sec):
-    print('sec -> Post Revocation Registry Delta to Ledger')
-    await send_revoc_reg_entry_or_delta(sec['pool'], sec['wallet'], sec['did'], sec['cred_revoc_reg_id'], sec['cred_rev_reg_delta'])
-
-
-async def gs___post_revocation_registry_delta_to_ledger(gs):
     print('Goldman Sachs -> Post Revocation Registry Delta to Ledger')
     await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_rev_reg_delta'])
+
+    print('========================================')
+    input('')
 
 
 async def sig___decrypt_cred_from_gs__store_cred_in_wallet(sig):
@@ -516,12 +509,6 @@ async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, revoked):
         assert not await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
     else:
         print('JP Morgan -> Verify KYC Credentials are valid')
-        print(jp['cred_proof_request'])
-        print(jp['cred_proof'])
-        print(jp['cred_schemas'])
-        print(jp['cred_defs'])
-        print(jp['cred_revoc_ref_defs'])
-        print(jp['cred_revoc_regs'])
         assert await anoncreds.verifier_verify_proof(jp['cred_proof_request'], jp['cred_proof'], jp['cred_schemas'], jp['cred_defs'], jp['cred_revoc_ref_defs'], jp['cred_revoc_regs'])
 
         print('JP Morgan -> Verify KYC Credential Proof')
@@ -536,7 +523,8 @@ async def jp___decrypt_cred_proof_from_sig__verify_cred_proof(jp, revoked):
 
 async def gs___revoke_cred_for_sig__post_revocation_registry_delta_to_ledger(gs):
     print('Goldman Sachs -> Revoke KYC Credential for Two Sigma')
-    gs['cred_rev_reg_delta'] = await anoncreds.issuer_revoke_credential(gs['wallet'], gs['blob_storage_reader_cfg_handle'], gs['cred_revoc_reg_id'], gs['cred_rev_id'])
+    tails_config_reader = await blob_storage.open_reader('default', gs['tails_config'])
+    gs['cred_rev_reg_delta'] = await anoncreds.issuer_revoke_credential(gs['wallet'], tails_config_reader, gs['cred_revoc_reg_id'], gs['cred_rev_id'])
 
     print('Goldman Sachs -> Post Revocation Registry Delta to Ledger')
     await send_revoc_reg_entry_or_delta(gs['pool'], gs['wallet'], gs['did'], gs['cred_revoc_reg_id'], gs['cred_rev_reg_delta'])
